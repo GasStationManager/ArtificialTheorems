@@ -14,5 +14,18 @@ name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.23.0"
 
+[[require]]
+name = "SafeVerify"
+git = "https://github.com/GasStationManager/SafeVerify.git"
+rev = "main"
+
+[[require]]
+name = "lean4checker"
+scope = "leanprover"
+rev = "v4.23.0"
+
 [[lean_lib]]
 name = "ArtificialTheorems"
+
+[[lean_lib]]
+name = "ArtificialTheoremsSpec"

@@ -1,1 +1,3 @@
 import ArtificialTheorems.Opt.RobbinsSiegmund
+import ArtificialTheorems.Opt.SGD
+import ArtificialTheorems.Opt.SGDUniqueMin
