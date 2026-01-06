@@ -1,13 +1,5 @@
-# ArtificialTheorems
+# ArtificialTheorems: Autoformalization of Theoretical Foundations of AI/ML
 
-## GitHub configuration
-
-To set up your new GitHub repository, follow these steps:
-
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
-
-After following the steps above, you can remove this section from the README file.
+This repo is a library of Lean formalizations of theoretical foundations of AI and ML. We explicitly allow and encourage AI-generated / AI-assisted proofs. 
+- The theorem statements (in directory `ArtificialTheoremsSpec/`) are vetted by human experts.
+- The proofs (in `ArtificialTheorems/`) are checked using secure verifiers (Comparator, SafeVerify) to ensure that they prove exactly the statements in `ArtificalTheoremsSpec/`
