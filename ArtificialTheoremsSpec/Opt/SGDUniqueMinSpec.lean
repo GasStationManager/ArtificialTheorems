@@ -18,26 +18,6 @@ variable (μ : Measure Ω) [IsProbabilityMeasure μ]
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
 variable [FiniteDimensional ℝ E]
 
-/-- Additional assumptions for Corollary 2.3.1 (Robbins-Monro with unique minimizer).
-
-These assumptions extend SGD_Convergence_Assumptions with:
-1. Continuity of h (already in base assumptions)
-2. Unique zero of the drift condition: {x : ⟨∇V(x), h(x)⟩ = 0} = {x*}
--/
-structure Assumptions
-    (X : ℕ → Ω → E)
-    (γ : ℕ → ℝ)
-    (h : E → E)
-    (ΔM R : ℕ → Ω → E)
-    (V : E → ℝ)
-    (gradV : E → E)
-    (ℱ : Filtration ℕ m0)
-    (x_star : E) : Prop where
-  /-- Base SGD convergence assumptions hold -/
-  base_asm : SGD_Convergence_Assumptions μ X γ h ΔM R V gradV ℱ
-  /-- x* is the unique point where drift vanishes -/
-  drift_zero_unique : {x : E | @inner ℝ _ _ (gradV x) (h x) = 0} = {x_star}
-
 /-- Simplified SGD assumptions for unbiased gradients with bounded variance.
 
 This extends SGD_Convergence_Assumptions with:

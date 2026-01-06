@@ -1,3 +1,5 @@
 import ArtificialTheoremsSpec.Opt.RobbinsSiegmundSpec
 import ArtificialTheoremsSpec.Opt.SGDSpec
 import ArtificialTheoremsSpec.Opt.SGDUniqueMinSpec
+import ArtificialTheoremsSpec.RL.ValueIterationCompleteSpec
+import ArtificialTheoremsSpec.RL.ApproxValueIterationIntSpec

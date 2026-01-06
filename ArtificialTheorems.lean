@@ -1,3 +1,5 @@
 import ArtificialTheorems.Opt.RobbinsSiegmund
 import ArtificialTheorems.Opt.SGD
 import ArtificialTheorems.Opt.SGDUniqueMin
+import ArtificialTheorems.RL.ValueIterationComplete
+import ArtificialTheorems.RL.ApproxValueIterationInt
