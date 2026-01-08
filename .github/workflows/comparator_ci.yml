@@ -46,9 +46,12 @@ jobs:
 
       - name: Install lean4export
         run: |
-          # Clone and build lean4export (uses master branch)
+          # Clone lean4export and build with project's Lean version
           git clone https://github.com/leanprover/lean4export.git /tmp/lean4export
           cd /tmp/lean4export
+          # Override lean-toolchain to match project's version for compatibility
+          cp $GITHUB_WORKSPACE/lean-toolchain ./lean-toolchain
+          lake update
           lake build
 
           # Add to PATH
@@ -56,11 +59,12 @@ jobs:
 
       - name: Build and install comparator
         run: |
-          # Clone comparator
+          # Clone comparator and build with project's Lean version
           git clone https://github.com/leanprover/comparator.git /tmp/comparator
           cd /tmp/comparator
-
-          # Build comparator
+          # Override lean-toolchain to match project's version for compatibility
+          cp $GITHUB_WORKSPACE/lean-toolchain ./lean-toolchain
+          lake update
           lake build
 
           # Store the path
