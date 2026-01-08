@@ -40,20 +40,18 @@ jobs:
           # https://github.com/Zouuup/landrun
           git clone --depth 1 https://github.com/Zouuup/landrun.git /tmp/landrun
           cd /tmp/landrun
-          go build -o landrun .
+          go build -o landrun ./cmd/landrun
           sudo mv landrun /usr/local/bin/
           echo "landrun installed successfully"
 
       - name: Install lean4export
         run: |
-          # Get lean4export matching our Lean version
-          LEAN_VERSION=$(cat lean-toolchain | sed 's/leanprover\/lean4://')
-          echo "Lean version: $LEAN_VERSION"
-
-          # Clone and build lean4export
+          # Clone lean4export and build with project's Lean version
           git clone https://github.com/leanprover/lean4export.git /tmp/lean4export
           cd /tmp/lean4export
-          git checkout "$LEAN_VERSION" || git checkout main
+          # Override lean-toolchain to match project's version for compatibility
+          cp $GITHUB_WORKSPACE/lean-toolchain ./lean-toolchain
+          lake update
           lake build
 
           # Add to PATH
@@ -61,11 +59,12 @@ jobs:
 
       - name: Build and install comparator
         run: |
-          # Clone comparator
+          # Clone comparator and build with project's Lean version
           git clone https://github.com/leanprover/comparator.git /tmp/comparator
           cd /tmp/comparator
-
-          # Build comparator
+          # Override lean-toolchain to match project's version for compatibility
+          cp $GITHUB_WORKSPACE/lean-toolchain ./lean-toolchain
+          lake update
           lake build
 
           # Store the path
