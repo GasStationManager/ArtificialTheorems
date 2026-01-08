@@ -46,14 +46,9 @@ jobs:
 
       - name: Install lean4export
         run: |
-          # Get lean4export matching our Lean version
-          LEAN_VERSION=$(cat lean-toolchain | sed 's/leanprover\/lean4://')
-          echo "Lean version: $LEAN_VERSION"
-
-          # Clone and build lean4export
+          # Clone and build lean4export (uses master branch)
           git clone https://github.com/leanprover/lean4export.git /tmp/lean4export
           cd /tmp/lean4export
-          git checkout "$LEAN_VERSION" || git checkout main
           lake build
 
           # Add to PATH
