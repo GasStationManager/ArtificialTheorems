@@ -40,7 +40,7 @@ jobs:
           # https://github.com/Zouuup/landrun
           git clone --depth 1 https://github.com/Zouuup/landrun.git /tmp/landrun
           cd /tmp/landrun
-          go build -o landrun .
+          go build -o landrun ./cmd/landrun
           sudo mv landrun /usr/local/bin/
           echo "landrun installed successfully"
 
