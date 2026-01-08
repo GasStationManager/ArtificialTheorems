@@ -1,0 +1,118 @@
+name: Comparator Verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (clean)
+        uses: actions/checkout@v5
+        with:
+          # Ensure clean checkout without any cached build artifacts
+          clean: true
+
+      - name: Install elan (Lean version manager)
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Set up Lean toolchain
+        run: |
+          # elan will read lean-toolchain and install the correct version
+          lake --version
+
+      - name: Install Go (for building landrun)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install landrun
+        run: |
+          # landrun is a Linux sandboxing tool using Landlock
+          # https://github.com/Zouuup/landrun
+          git clone --depth 1 https://github.com/Zouuup/landrun.git /tmp/landrun
+          cd /tmp/landrun
+          go build -o landrun .
+          sudo mv landrun /usr/local/bin/
+          echo "landrun installed successfully"
+
+      - name: Install lean4export
+        run: |
+          # Get lean4export matching our Lean version
+          LEAN_VERSION=$(cat lean-toolchain | sed 's/leanprover\/lean4://')
+          echo "Lean version: $LEAN_VERSION"
+
+          # Clone and build lean4export
+          git clone https://github.com/leanprover/lean4export.git /tmp/lean4export
+          cd /tmp/lean4export
+          git checkout "$LEAN_VERSION" || git checkout main
+          lake build
+
+          # Add to PATH
+          echo "/tmp/lean4export/.lake/build/bin" >> $GITHUB_PATH
+
+      - name: Build and install comparator
+        run: |
+          # Clone comparator
+          git clone https://github.com/leanprover/comparator.git /tmp/comparator
+          cd /tmp/comparator
+
+          # Build comparator
+          lake build
+
+          # Store the path
+          echo "COMPARATOR_BIN=/tmp/comparator/.lake/build/bin/comparator" >> $GITHUB_ENV
+
+      - name: Fetch Mathlib cache
+        run: |
+          # Get mathlib cache for faster builds during comparator verification
+          # This only downloads prebuilt dependencies, not our solution modules
+          lake exe cache get || true
+
+      - name: Ensure clean solution environment
+        run: |
+          # CRITICAL: Comparator requires that solution files have NOT been
+          # previously compiled. Remove any potential build artifacts for
+          # our solution modules to ensure a clean verification environment.
+          rm -rf .lake/build/lib/ArtificialTheorems || true
+          rm -rf .lake/build/lib/ArtificialTheoremsSpec || true
+          echo "Clean solution environment confirmed"
+
+      - name: Run comparator verification
+        run: |
+          echo "========================================="
+          echo "Running Comparator Verification"
+          echo "========================================="
+
+          FAILED=0
+
+          for config in scripts/comparator/*.json; do
+            echo ""
+            echo "-----------------------------------------"
+            echo "Verifying: $config"
+            echo "-----------------------------------------"
+
+            if lake env "$COMPARATOR_BIN" "$config"; then
+              echo "PASSED: $config"
+            else
+              echo "FAILED: $config"
+              FAILED=1
+            fi
+          done
+
+          echo ""
+          echo "========================================="
+          if [ $FAILED -eq 0 ]; then
+            echo "All comparator verifications passed!"
+          else
+            echo "Some comparator verifications failed!"
+            exit 1
+          fi

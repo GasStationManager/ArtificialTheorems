@@ -1,0 +1,10 @@
+{
+    "challenge_module": "ArtificialTheoremsSpec.Opt.RobbinsSiegmundSpec",
+    "solution_module": "ArtificialTheorems.Opt.RobbinsSiegmund",
+    "theorem_names": [
+        "QLS.Stoch.robbinsSiegmund_expBound",
+        "QLS.Stoch.robbinsSiegmund_full"
+    ],
+    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+    "enable_nanoda": false
+}

@@ -1,0 +1,9 @@
+{
+    "challenge_module": "ArtificialTheoremsSpec.RL.ValueIterationCompleteSpec",
+    "solution_module": "ArtificialTheorems.RL.ValueIterationComplete",
+    "theorem_names": [
+        "VALUE_ITERATION_CONVERGENCE_COMPLETE"
+    ],
+    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+    "enable_nanoda": false
+}

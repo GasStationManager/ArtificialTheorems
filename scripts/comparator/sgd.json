@@ -1,0 +1,9 @@
+{
+    "challenge_module": "ArtificialTheoremsSpec.Opt.SGDSpec",
+    "solution_module": "ArtificialTheorems.Opt.SGD",
+    "theorem_names": [
+        "convergence_stochastic_gradient_method"
+    ],
+    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+    "enable_nanoda": false
+}
