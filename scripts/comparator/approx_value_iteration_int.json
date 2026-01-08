@@ -1,0 +1,10 @@
+{
+    "challenge_module": "ArtificialTheoremsSpec.RL.ApproxValueIterationIntSpec",
+    "solution_module": "ArtificialTheorems.RL.ApproxValueIterationInt",
+    "theorem_names": [
+        "ApproxValueIterationInt.INT_VALUE_ITERATION_APPROX",
+        "ApproxValueIterationInt.INT_VALUE_ITERATION_EVENTUAL_BALL"
+    ],
+    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+    "enable_nanoda": false
+}

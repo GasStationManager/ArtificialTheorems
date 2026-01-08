@@ -2,6 +2,9 @@
 # Verification script for ArtificialTheorems
 # 1. Runs lean4checker on all modules in ArtificialTheorems
 # 2. Runs safe_verify on spec/impl pairs
+#
+# For additional verification using comparator (sandboxed verification),
+# see: scripts/verify_comparator.sh
 
 set -e
 
