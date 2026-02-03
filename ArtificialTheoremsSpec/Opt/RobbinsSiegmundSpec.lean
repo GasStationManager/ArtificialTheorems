@@ -7,11 +7,13 @@ import Mathlib
 open MeasureTheory Filter
 open scoped ProbabilityTheory BigOperators NNReal
 
+universe u
+
 namespace QLS
 namespace Stoch
 
 /-- Cumulative product `∏_{k < t} (1 + Y_{k+1})`. -/
-noncomputable def prodY (Y : ℕ → Ω → ℝ) (t : ℕ) : Ω → ℝ :=
+noncomputable def prodY.{v} {Ω : Type v} (Y : ℕ → Ω → ℝ) (t : ℕ) : Ω → ℝ :=
   fun ω => (Finset.range t).prod fun k => 1 + Y (k + 1) ω
 
 /-- Robbins–Siegmund variant under expectation-level summability and a uniform product bound.
@@ -28,8 +30,8 @@ Conclusions:
 - `X t` converges almost surely to a finite limit
 - `∑ W t` is finite almost surely
 -/
-theorem robbinsSiegmund_expBound
-    {Ω : Type*} [m0 : MeasurableSpace Ω]
+theorem robbinsSiegmund_expBound.{v}
+    {Ω : Type v} [m0 : MeasurableSpace Ω]
     (μ : Measure Ω) [IsFiniteMeasure μ]
     (ℱ : Filtration ℕ m0)
     (X Y Z W : ℕ → Ω → ℝ)
@@ -70,8 +72,8 @@ Conclusions:
 - `sup E[V_n] < ∞`
 - `∑ U_n < ∞` a.s.
 -/
-theorem robbinsSiegmund_full
-    {Ω : Type*} [m0 : MeasurableSpace Ω]
+theorem robbinsSiegmund_full.{v}
+    {Ω : Type v} [m0 : MeasurableSpace Ω]
     (μ : Measure Ω) [IsProbabilityMeasure μ]
     (ℱ : Filtration ℕ m0)
     (V U α β : ℕ → Ω → ℝ)

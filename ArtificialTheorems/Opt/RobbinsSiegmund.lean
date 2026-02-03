@@ -9,11 +9,15 @@ set_option linter.unnecessarySimpa false
 set_option linter.unusedSimpArgs false
 set_option maxHeartbeats 0
 
-open MeasureTheory
+open MeasureTheory Filter
 open scoped ProbabilityTheory BigOperators NNReal
 
 namespace QLS
 namespace Stoch
+
+/-- Cumulative product `∏_{k < t} (1 + Y_{k+1})`. -/
+noncomputable def prodY.{v} {Ω : Type v} (Y : ℕ → Ω → ℝ) (t : ℕ) : Ω → ℝ :=
+  fun ω => (Finset.range t).prod fun k => 1 + Y (k + 1) ω
 
 section Classical
 
@@ -22,10 +26,6 @@ variable (μ : Measure Ω) [IsFiniteMeasure μ]
 variable (ℱ : Filtration ℕ m0)
 
 variable (X Y Z W : ℕ → Ω → ℝ)
-
-/-- Cumulative product `∏_{k < t} (1 + Y_{k+1})`. -/
-noncomputable def prodY (Y : ℕ → Ω → ℝ) (t : ℕ) : Ω → ℝ :=
-  fun ω => (Finset.range t).prod fun k => 1 + Y (k + 1) ω
 
 /-- Cumulative sum of `W`. -/
 def cumW (W : ℕ → Ω → ℝ) (t : ℕ) : Ω → ℝ :=
@@ -1923,7 +1923,6 @@ end QLS
 
 namespace QLS
 namespace Stoch
-namespace Classical
 
 open MeasureTheory Filter
 
@@ -1941,8 +1940,8 @@ Conclusions:
 - `X t` converges almost surely to a finite limit
 - `∑ W t` is finite almost surely
 -/
-theorem robbinsSiegmund_expBound
-    {Ω : Type*} [m0 : MeasurableSpace Ω]
+theorem robbinsSiegmund_expBound.{v}
+    {Ω : Type v} [m0 : MeasurableSpace Ω]
     (μ : Measure Ω) [IsFiniteMeasure μ]
     (ℱ : Filtration ℕ m0)
     (X Y Z W : ℕ → Ω → ℝ)
@@ -2742,7 +2741,6 @@ theorem robbinsSiegmund_expBound
     exact this.choose_spec
   exact ⟨Xlim, hX_tend, hW_ae_sum⟩
 
-end Classical
 end Stoch
 end QLS
 
@@ -3908,8 +3906,8 @@ Let (V_n), (U_n), (α_n), (β_n) be four sequences of non-negative integrable
 - (a) V_n → V_∞ ∈ L¹ almost surely, and sup_{n≥0} E[V_n] < +∞
 - (b) ∑_{n≥0} U_n < +∞ almost surely
 -/
-theorem robbinsSiegmund_full
-    {Ω : Type*} [m0 : MeasurableSpace Ω]
+theorem robbinsSiegmund_full.{v}
+    {Ω : Type v} [m0 : MeasurableSpace Ω]
     (μ : Measure Ω) [IsProbabilityMeasure μ]
     (ℱ : Filtration ℕ m0)
     (V U α β : ℕ → Ω → ℝ)
