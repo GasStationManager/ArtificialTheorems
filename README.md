@@ -5,6 +5,22 @@ This repo is a library of Lean formalizations of theoretical foundations of AI a
 - The proofs (in `ArtificialTheorems/`) are checked using secure verifiers (Comparator, SafeVerify) to ensure that they prove exactly the statements in `ArtificalTheoremsSpec/`
 
 
+## Verification
+
+To verify that the proofs match their specifications, run:
+
+```bash
+./scripts/verify.sh
+```
+
+This script:
+1. Builds both `ArtificialTheorems` and `ArtificialTheoremsSpec`
+2. Runs `lean4checker` on all implementation modules to validate the olean files
+3. Runs `safe_verify` on each spec/impl pair to ensure the implementations match their specifications exactly
+
+All checks must pass for the proofs to be considered valid.
+
+
 ## Wish List
 
 Contributions are appreciated! Both formal theorem statements vetted by human experts, and autoformalizations of proofs. 
