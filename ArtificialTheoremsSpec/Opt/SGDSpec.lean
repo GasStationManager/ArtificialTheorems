@@ -10,6 +10,7 @@ open scoped RealInnerProductSpace
 variable {Ω : Type*} [m0 : MeasurableSpace Ω]
 variable (μ : Measure Ω) [IsProbabilityMeasure μ]
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+  [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
 
 /-- The Stochastic Algorithm recursion defined in Eq (2.5):
 X_{n+1} = X_n - γ_{n+1} h(X_n) + γ_{n+1}(ΔM_{n+1} + R_{n+1}) -/

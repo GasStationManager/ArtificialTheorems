@@ -16,6 +16,7 @@ namespace SGDUniqueMin
 variable {Ω : Type*} [m0 : MeasurableSpace Ω]
 variable (μ : Measure Ω) [IsProbabilityMeasure μ]
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+  [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
 variable [FiniteDimensional ℝ E]
 
 /-- Simplified SGD assumptions for unbiased gradients with bounded variance.
