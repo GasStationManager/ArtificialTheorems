@@ -352,32 +352,25 @@ theorem INT_VALUE_ITERATION_APPROX
     _ = γr^n * dist (castZtoR v₀) v_star + ((1 : ℝ) / 2) / (1 - γr) := by
       simp [e, div_eq_mul_inv]
 
--- Eventual ball corollary (to be proved)
+-- Eventual ball corollary
 theorem INT_VALUE_ITERATION_EVENTUAL_BALL
     (mdp : MDP S A) (γ : ℚ) (hγ_nonneg : 0 ≤ γ) (hγ_lt : γ < 1)
     (ε : ℝ) (hε : ((1 : ℝ) / 2) / (1 - (γ : ℝ)) < ε) :
-    ∀ v₀ : S → ℤ, ∀ᶠ n in atTop,
-      let v_starWitness := Classical.choose
-        (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)
-      have hfix := (Classical.choose_spec
-        (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)).1
-      let v_star : S → ℝ := v_starWitness
-      dist (castZtoR ((bellmanOperatorInt (S:=S) (A:=A) mdp γ)^[n] v₀)) v_star ≤ ε := by
+    ∃ v_star : S → ℝ,
+      bellmanOperatorReal (S:=S) (A:=A) mdp (γ : ℝ) v_star = v_star ∧
+      ∀ v₀ : S → ℤ, ∀ᶠ n in atTop,
+        dist (castZtoR ((bellmanOperatorInt (S:=S) (A:=A) mdp γ)^[n] v₀)) v_star ≤ ε := by
   classical
-  intro v₀
+  -- Extract the fixed point and quantitative inequality from INT_VALUE_ITERATION_APPROX
+  obtain ⟨v_star, hfix, Hbound⟩ :=
+    INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt
+  refine ⟨v_star, hfix, fun v₀ => ?_⟩
   -- Real parameters
   set γr : ℝ := (γ : ℝ)
   have hγr_nonneg : (0 : ℝ) ≤ γr := Rat.cast_nonneg.mpr hγ_nonneg
   have hγr_lt : γr < 1 := by
     rw [← Rat.cast_one, show γr = (γ : ℝ) by rfl]; exact Rat.cast_lt.mpr hγ_lt
-  -- Extract the fixed point and quantitative inequality
-  set v_starWitness := Classical.choose
-    (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)
-  have hpair := Classical.choose_spec
-    (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)
-  have hfix := hpair.1
-  let v_star : S → ℝ := v_starWitness
-  have Hbound := hpair.2 v₀
+  have Hbound := Hbound v₀
   -- Noise floor and margin
   let M : ℝ := ((1 : ℝ) / 2) / (1 - γr)
   have hMlt : M < ε := hε
