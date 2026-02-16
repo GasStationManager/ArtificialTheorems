@@ -58,13 +58,10 @@ For any ε > (1/2)/(1-γ), the iterates eventually stay within distance ε of v*
 theorem INT_VALUE_ITERATION_EVENTUAL_BALL
     (mdp : MDP S A) (γ : ℚ) (hγ_nonneg : 0 ≤ γ) (hγ_lt : γ < 1)
     (ε : ℝ) (hε : ((1 : ℝ) / 2) / (1 - (γ : ℝ)) < ε) :
-    ∀ v₀ : S → ℤ, ∀ᶠ n in atTop,
-      let v_starWitness := Classical.choose
-        (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)
-      have hfix := (Classical.choose_spec
-        (INT_VALUE_ITERATION_APPROX (S:=S) (A:=A) mdp γ hγ_nonneg hγ_lt)).1
-      let v_star : S → ℝ := v_starWitness
-      dist (castZtoR ((bellmanOperatorInt (S:=S) (A:=A) mdp γ)^[n] v₀)) v_star ≤ ε := by
+    ∃ v_star : S → ℝ,
+      bellmanOperatorReal (S:=S) (A:=A) mdp (γ : ℝ) v_star = v_star ∧
+      ∀ v₀ : S → ℤ, ∀ᶠ n in atTop,
+        dist (castZtoR ((bellmanOperatorInt (S:=S) (A:=A) mdp γ)^[n] v₀)) v_star ≤ ε := by
   sorry
 
 end ApproxValueIterationInt
