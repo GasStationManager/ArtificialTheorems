@@ -209,11 +209,9 @@ theorem halfspaces_of_sigmoidal_integrals
       (μ₁ {x | 0 < ip x}).toReal + σ b * (μ₁ {x | ip x = 0}).toReal =
       (μ₂ {x | 0 < ip x}).toReal + σ b * (μ₂ {x | ip x = 0}).toReal := by
     intro b
-    -- Define F_k(x) = σ(k · ip(x) + b) and limit function
     set F : ℕ → ↥(UnitCube n) → ℝ := fun k x => σ (↑k * ip x + b)
     set f_lim : ↥(UnitCube n) → ℝ := fun x =>
         if 0 < ip x then 1 else if ip x = 0 then σ b else 0
-    -- BCT hypothesis 1: equal integrals
     have h_eq_k : ∀ k : ℕ, ∫ x, F k x ∂μ₁ = ∫ x, F k x ∂μ₂ := by
       intro k
       have := h (fun i => ↑k * w i) (↑k * a + b)
@@ -222,13 +220,107 @@ theorem halfspaces_of_sigmoidal_integrals
         simp [F, ip, mul_add, Finset.mul_sum, add_assoc, add_assoc, add_comm, mul_assoc]
       · ext x
         simp [F, ip, mul_add, Finset.mul_sum, add_assoc, add_assoc, add_comm, mul_assoc]
-    -- Step A: BCT gives ∫ F k dμᵢ → ∫ f_lim dμᵢ
-    -- Step B: equal limits means ∫ f_lim dμ₁ = ∫ f_lim dμ₂
-    -- Step C: ∫ f_lim dμ = μ{ip>0} + σ(b)·μ{ip=0}
-    -- All three steps require significant measurability/integrability plumbing.
-    -- The mathematical content is routine (BCT + piecewise integral decomposition)
-    -- but Lean formalization requires ~100 LOC of API threading.
-    sorry -- BCT + integral decomposition (routine but verbose)
+    obtain ⟨C, hC⟩ := hσ_bdd
+    have hcont_ip : Continuous ip := by
+      change Continuous (fun x : ↥(UnitCube n) => ∑ i, w i * (x : Fin n → ℝ) i + a)
+      exact
+        (continuous_finset_sum _ fun i _ =>
+          continuous_const.mul
+            ((continuous_apply i : Continuous fun x : Fin n → ℝ => x i).comp
+              continuous_subtype_val)).add continuous_const
+    have hmeas_pos : MeasurableSet {x | 0 < ip x} :=
+      measurableSet_lt measurable_const hcont_ip.measurable
+    have hmeas_zero : MeasurableSet {x | ip x = 0} :=
+      measurableSet_eq_fun hcont_ip.measurable measurable_const
+    have hF_meas : ∀ k : ℕ, Continuous (F k) := by
+      intro k
+      change Continuous (fun x : ↥(UnitCube n) => σ (↑k * ip x + b))
+      exact hσ_cont.comp ((continuous_const.mul hcont_ip).add continuous_const)
+    have hF_bound₁ : ∀ k : ℕ, ∀ᵐ x ∂μ₁, ‖F k x‖ ≤ (fun _ : ↥(UnitCube n) => C) x := by
+      intro k
+      exact Filter.Eventually.of_forall fun x => by
+        change ‖σ (↑k * ip x + b)‖ ≤ C
+        exact hC (↑k * ip x + b)
+    have hF_bound₂ : ∀ k : ℕ, ∀ᵐ x ∂μ₂, ‖F k x‖ ≤ (fun _ : ↥(UnitCube n) => C) x := by
+      intro k
+      exact Filter.Eventually.of_forall fun x => by
+        change ‖σ (↑k * ip x + b)‖ ≤ C
+        exact hC (↑k * ip x + b)
+    have hF_lim : ∀ x : ↥(UnitCube n), Tendsto (fun k : ℕ => F k x) atTop (𝓝 (f_lim x)) := by
+      intro x
+      by_cases hx_pos : 0 < ip x
+      · have harg : Tendsto (fun k : ℕ => (↑k : ℝ) * ip x + b) atTop atTop :=
+          Filter.Tendsto.atTop_add
+            (tendsto_natCast_atTop_atTop.atTop_mul_const' hx_pos) tendsto_const_nhds
+        have hσ_lim : Tendsto (fun k : ℕ => σ ((↑k : ℝ) * ip x + b)) atTop (𝓝 1) :=
+          hσ_sig.1.comp harg
+        change Tendsto (fun k : ℕ => σ ((↑k : ℝ) * ip x + b)) atTop (𝓝 (f_lim x))
+        simpa [f_lim, hx_pos, hx_pos.ne'] using hσ_lim
+      · by_cases hx_zero : ip x = 0
+        · change Tendsto (fun k : ℕ => σ ((↑k : ℝ) * ip x + b)) atTop (𝓝 (f_lim x))
+          simpa [f_lim, hx_pos, hx_zero] using
+            (tendsto_const_nhds : Tendsto (fun _ : ℕ => σ b) atTop (𝓝 (σ b)))
+        · have hx_neg : ip x < 0 := lt_of_le_of_ne (le_of_not_gt hx_pos) hx_zero
+          have harg : Tendsto (fun k : ℕ => (↑k : ℝ) * ip x + b) atTop atBot :=
+            Filter.Tendsto.atBot_add
+              (tendsto_natCast_atTop_atTop.atTop_mul_const_of_neg' hx_neg) tendsto_const_nhds
+          have hσ_lim : Tendsto (fun k : ℕ => σ ((↑k : ℝ) * ip x + b)) atTop (𝓝 0) :=
+            hσ_sig.2.comp harg
+          change Tendsto (fun k : ℕ => σ ((↑k : ℝ) * ip x + b)) atTop (𝓝 (f_lim x))
+          simpa [f_lim, hx_pos, hx_zero] using hσ_lim
+    have hlim₁ :
+        Tendsto (fun k : ℕ => ∫ x, F k x ∂μ₁) atTop (𝓝 <| ∫ x, f_lim x ∂μ₁) :=
+      tendsto_integral_of_dominated_convergence (μ := μ₁) (bound := fun _ => C)
+        (fun k => (hF_meas k).aestronglyMeasurable)
+        (integrable_const C) hF_bound₁ (ae_of_all _ hF_lim)
+    have hlim₂ :
+        Tendsto (fun k : ℕ => ∫ x, F k x ∂μ₂) atTop (𝓝 <| ∫ x, f_lim x ∂μ₂) :=
+      tendsto_integral_of_dominated_convergence (μ := μ₂) (bound := fun _ => C)
+        (fun k => (hF_meas k).aestronglyMeasurable)
+        (integrable_const C) hF_bound₂ (ae_of_all _ hF_lim)
+    have h_int_eq : ∫ x, f_lim x ∂μ₁ = ∫ x, f_lim x ∂μ₂ := by
+      have hlim₂' :
+          Tendsto (fun k : ℕ => ∫ x, F k x ∂μ₁) atTop (𝓝 <| ∫ x, f_lim x ∂μ₂) := by
+        exact hlim₂.congr' (Filter.Eventually.of_forall fun k => (h_eq_k k).symm)
+      exact tendsto_nhds_unique hlim₁ hlim₂'
+    have h_int_formula (μ : Measure ↥(UnitCube n)) [IsFiniteMeasure μ] :
+        ∫ x, f_lim x ∂μ =
+          (μ {x | 0 < ip x}).toReal + σ b * (μ {x | ip x = 0}).toReal := by
+      have hpos_int : Integrable (Set.indicator {x | 0 < ip x} (fun _ => (1 : ℝ))) μ :=
+        (integrable_const 1).indicator hmeas_pos
+      have hzero_int : Integrable (Set.indicator {x | ip x = 0} (fun _ => σ b)) μ :=
+        (integrable_const (σ b)).indicator hmeas_zero
+      have hf_lim_eq :
+          f_lim =
+            fun x =>
+              Set.indicator {x | 0 < ip x} (fun _ => (1 : ℝ)) x +
+                Set.indicator {x | ip x = 0} (fun _ => σ b) x := by
+        funext x
+        by_cases hx_pos : 0 < ip x
+        · simp [f_lim, hx_pos, hx_pos.ne']
+        · by_cases hx_zero : ip x = 0
+          · simp [f_lim, hx_pos, hx_zero]
+          · simp [f_lim, hx_pos, hx_zero]
+      calc
+        ∫ x, f_lim x ∂μ
+            = ∫ x,
+                Set.indicator {x | 0 < ip x} (fun _ => (1 : ℝ)) x +
+                  Set.indicator {x | ip x = 0} (fun _ => σ b) x ∂μ := by
+              rw [hf_lim_eq]
+        _ = ∫ x, Set.indicator {x | 0 < ip x} (fun _ => (1 : ℝ)) x ∂μ +
+              ∫ x, Set.indicator {x | ip x = 0} (fun _ => σ b) x ∂μ := by
+              rw [integral_add hpos_int hzero_int]
+        _ = ∫ x in {x | 0 < ip x}, (1 : ℝ) ∂μ + ∫ x in {x | ip x = 0}, σ b ∂μ := by
+              rw [integral_indicator hmeas_pos, integral_indicator hmeas_zero]
+        _ = (μ {x | 0 < ip x}).toReal + σ b * (μ {x | ip x = 0}).toReal := by
+              rw [setIntegral_one_eq_measureReal, setIntegral_const]
+              simp [measureReal_def, smul_eq_mul, mul_comm]
+    calc
+      (μ₁ {x | 0 < ip x}).toReal + σ b * (μ₁ {x | ip x = 0}).toReal = ∫ x, f_lim x ∂μ₁ := by
+        symm
+        exact h_int_formula μ₁
+      _ = ∫ x, f_lim x ∂μ₂ := h_int_eq
+      _ = (μ₂ {x | 0 < ip x}).toReal + σ b * (μ₂ {x | ip x = 0}).toReal := h_int_formula μ₂
   -- Sub-lemma 4: Algebraic conclusion
   -- h_bct for varying b gives: d_pos + σ(b) · d_zero = 0 for all b.
   -- Since σ is not constant (limits 0 and 1), d_zero = 0, hence d_pos = 0.
