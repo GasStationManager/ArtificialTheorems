@@ -221,10 +221,13 @@ theorem halfspaces_of_sigmoidal_integrals
       intro k
       have := h (fun i => ↑k * w i) b
       convert this using 2 <;> ext x <;> simp [F, ip, Finset.mul_sum, mul_assoc]
-    -- The BCT argument: σ(k⟨w,x⟩+b) → f_lim pointwise, bounded by C,
-    -- so ∫ σ(k⟨w,x⟩+b) dμᵢ → ∫ f_lim dμᵢ, and ∫ f_lim dμᵢ = μᵢ{ip>0} + σ(b)·μᵢ{ip=0}.
-    -- Detailed formalization of BCT + integral decomposition sorry'd.
-    sorry
+    -- Step A: BCT gives ∫ F k dμᵢ → ∫ f_lim dμᵢ
+    -- Step B: equal limits means ∫ f_lim dμ₁ = ∫ f_lim dμ₂
+    -- Step C: ∫ f_lim dμ = μ{ip>0} + σ(b)·μ{ip=0}
+    -- All three steps require significant measurability/integrability plumbing.
+    -- The mathematical content is routine (BCT + piecewise integral decomposition)
+    -- but Lean formalization requires ~100 LOC of API threading.
+    sorry -- BCT + integral decomposition (routine but verbose)
   -- Sub-lemma 4: Algebraic conclusion
   -- h_bct for varying b gives: d_pos + σ(b) · d_zero = 0 for all b.
   -- Since σ is not constant (limits 0 and 1), d_zero = 0, hence d_pos = 0.
