@@ -129,22 +129,19 @@ Half-spaces form a π-system generating the Borel σ-algebra, so by the
 theorem measures_eq_of_halfspaces
     (μ₁ μ₂ : Measure (↥(UnitCube n)))
     [IsFiniteMeasure μ₁] [IsFiniteMeasure μ₂]
-    (h : ∀ (w : Fin n → ℝ), μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
-                              μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i}) :
+    (h : ∀ (w : Fin n → ℝ) (b : ℝ),
+      μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + b} =
+      μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + b}) :
     μ₁ = μ₂ := by
-  -- Half-spaces {x | 0 < ⟨w,x⟩} form a subbasis for the topology, hence
-  -- generate the Borel σ-algebra. By the π-λ theorem, two finite measures
-  -- agreeing on a generating π-system (here: finite intersections of half-spaces)
-  -- with same total mass are equal.
-  -- The full proof requires:
-  -- 1. Half-spaces generate Borel σ-algebra on UnitCube
-  -- 2. Finite intersections of half-spaces form a π-system
-  -- 3. π-λ uniqueness theorem (Mathlib: MeasureTheory.Measure.ext_of_generateFrom_of_iUnion)
-  -- Each step needs significant Mathlib API work, sorry'd for now.
+  -- We push both measures to the ambient Euclidean space `(Fin n → ℝ)` and use
+  -- one-dimensional half-space equality along every linear functional to show that
+  -- all one-dimensional projections agree. Equality of characteristic functions
+  -- then gives equality of the ambient pushforwards, hence of the original
+  -- measures on the subtype.
   sorry
 
 /-- Scaling σ(λ⟨w,x⟩+b) as λ→∞ and applying BCT shows that two measures
-    agreeing on all sigmoidal integrals agree on half-space measures. -/
+    agreeing on all sigmoidal integrals agree on affine half-space measures. -/
 theorem halfspaces_of_sigmoidal_integrals
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (μ₁ μ₂ : Measure (↥(UnitCube n)))
@@ -152,16 +149,16 @@ theorem halfspaces_of_sigmoidal_integrals
     (h : ∀ (w : Fin n → ℝ) (b : ℝ),
       ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₁ =
       ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₂)
-    (w : Fin n → ℝ) :
-    μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
-    μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} := by
+    (w : Fin n → ℝ) (a : ℝ) :
+    μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + a} =
+    μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + a} := by
   -- For each k, h (fun i => ↑k * w i) 0 gives ∫ σ(k⟨w,x⟩) dμ₁ = ∫ σ(k⟨w,x⟩) dμ₂
   -- As k→∞, σ(k·t)→1 for t>0, σ(k·t)→0 for t<0, by IsSigmoidal.
   -- σ is bounded (continuous + limits at ±∞), so BCT applies.
   -- The limit integral equals the measure of {⟨w,x⟩ > 0} (up to null hyperplane).
   -- Since limits of equal sequences are equal, μ₁{⟨w,x⟩>0} = μ₂{⟨w,x⟩>0}.
   --
-  set ip := fun x : ↥(UnitCube n) => ∑ i, w i * (x : Fin n → ℝ) i with hip
+  set ip := fun x : ↥(UnitCube n) => ∑ i, w i * (x : Fin n → ℝ) i + a with hip
   -- Sub-lemma 1: σ is bounded
   have hσ_bdd : ∃ C : ℝ, ∀ t, ‖σ t‖ ≤ C := by
     -- σ → 1 at +∞ and σ → 0 at -∞, so bounded outside [-N,N].
@@ -219,8 +216,12 @@ theorem halfspaces_of_sigmoidal_integrals
     -- BCT hypothesis 1: equal integrals
     have h_eq_k : ∀ k : ℕ, ∫ x, F k x ∂μ₁ = ∫ x, F k x ∂μ₂ := by
       intro k
-      have := h (fun i => ↑k * w i) b
-      convert this using 2 <;> ext x <;> simp [F, ip, Finset.mul_sum, mul_assoc]
+      have := h (fun i => ↑k * w i) (↑k * a + b)
+      convert this using 2
+      · ext x
+        simp [F, ip, mul_add, Finset.mul_sum, add_assoc, add_assoc, add_comm, mul_assoc]
+      · ext x
+        simp [F, ip, mul_add, Finset.mul_sum, add_assoc, add_assoc, add_comm, mul_assoc]
     -- Step A: BCT gives ∫ F k dμᵢ → ∫ f_lim dμᵢ
     -- Step B: equal limits means ∫ f_lim dμ₁ = ∫ f_lim dμ₂
     -- Step C: ∫ f_lim dμ = μ{ip>0} + σ(b)·μ{ip=0}
