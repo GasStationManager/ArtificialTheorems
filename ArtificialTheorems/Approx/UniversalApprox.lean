@@ -4,8 +4,8 @@ Universal Approximation Theorem (Cybenko 1989) - Proof
 Architecture:
 - dense_of_forall_dual_vanish_eq_zero: Hahn-Banach density (Mathlib ingredients exist)
 - riesz_decomposition: L = L⁺ - L⁻ (sorry — Banach lattice, not in Mathlib)
-- sigmoidal_measures_eq: BCT + π-λ (sorry — measure theory)
-- neuralNet_annihilator_trivial: combines decomposition + measures
+- sigmoidal_measures_eq: BCT + π-λ (decomposed into sub-lemmas)
+- neuralNet_annihilator_trivial: combines decomposition + measures (structured proof)
 - neuralNet_dense: combines Hahn-Banach + annihilator
 - universal_approximation_cybenko': density → uniform approximation (proved)
 -/
@@ -65,10 +65,6 @@ theorem dense_of_forall_dual_vanish_eq_zero
     (S : Submodule ℝ E)
     (h : ∀ L : E →L[ℝ] ℝ, (∀ s ∈ (S : Set E), L s = 0) → L = 0) :
     Dense (S : Set E) := by
-  -- Proof: suppose not dense. Pick g ∉ closure(S). Hahn-Banach gives L
-  -- with L(a) < u for a ∈ closure(S) and u < L(g). For s ∈ S, r • s ∈ S
-  -- for all r, so r * L(s) < u for all r, forcing L(s) = 0.
-  -- But h says L = 0, contradicting L(g) > 0.
   rw [dense_iff_closure_eq]
   by_contra h_ne
   have ⟨g, hg⟩ : ∃ g, g ∉ closure (S : Set E) := by
@@ -117,15 +113,40 @@ theorem riesz_decomposition
       ∀ f, L f = Lpos f - Lneg f := by
   sorry -- Banach lattice decomposition
 
-/-! ## Lemma 3: Sigmoidal measure uniqueness (sorry'd)
+/-! ## Lemma 3: Sigmoidal measure uniqueness
 
 If two finite measures agree on ∫ σ(⟨w,x⟩+b) for all w,b where σ is
 continuous sigmoidal, then they are equal.
 
-Proof sketch: scale w by λ→∞. By bounded convergence theorem,
-σ(λ⟨w,x⟩+b) → 1_{⟨w,x⟩>0} + σ(b)·1_{⟨w,x⟩=0}. So the measures agree
-on all half-spaces. Since half-spaces generate the Borel σ-algebra
-(π-system), the measures are equal by Dynkin's theorem. -/
+Proof: scale w by λ→∞. By BCT, σ(λ⟨w,x⟩+b) → 1_{⟨w,x⟩>0} pointwise
+(up to the hyperplane). So the measures agree on all open half-spaces.
+Half-spaces form a π-system generating the Borel σ-algebra, so by the
+π-λ theorem (uniqueness of extension), μ₁ = μ₂. -/
+
+/-- Two finite measures agreeing on all open half-spaces are equal.
+    Uses: open half-spaces form a π-system generating Borel σ-algebra,
+    then apply π-λ uniqueness theorem. -/
+theorem measures_eq_of_halfspaces
+    (μ₁ μ₂ : Measure (↥(UnitCube n)))
+    [IsFiniteMeasure μ₁] [IsFiniteMeasure μ₂]
+    (h : ∀ (w : Fin n → ℝ), μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
+                              μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i}) :
+    μ₁ = μ₂ := by
+  sorry -- π-system / Dynkin argument: half-spaces generate the Borel σ-algebra
+
+/-- Scaling σ(λ⟨w,x⟩+b) as λ→∞ and applying BCT shows that two measures
+    agreeing on all sigmoidal integrals agree on half-space measures. -/
+theorem halfspaces_of_sigmoidal_integrals
+    (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
+    (μ₁ μ₂ : Measure (↥(UnitCube n)))
+    [IsFiniteMeasure μ₁] [IsFiniteMeasure μ₂]
+    (h : ∀ (w : Fin n → ℝ) (b : ℝ),
+      ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₁ =
+      ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₂)
+    (w : Fin n → ℝ) :
+    μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
+    μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} := by
+  sorry -- BCT: scale w↦λw with λ→∞, σ(λ⟨w,x⟩) → indicator, integrals converge
 
 theorem sigmoidal_measures_eq
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
@@ -134,8 +155,9 @@ theorem sigmoidal_measures_eq
     (h : ∀ (w : Fin n → ℝ) (b : ℝ),
       ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₁ =
       ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₂) :
-    μ₁ = μ₂ := by
-  sorry -- BCT + π-λ uniqueness
+    μ₁ = μ₂ :=
+  measures_eq_of_halfspaces μ₁ μ₂
+    (halfspaces_of_sigmoidal_integrals σ hσ_cont hσ_sig μ₁ μ₂ h)
 
 /-! ## Lemma 4: Annihilator is trivial
 
@@ -143,11 +165,55 @@ Any continuous linear functional vanishing on all neural net functions
 is zero. Proof: decompose L = L⁺ - L⁻ (Lemma 2), convert to measures
 via positive RMK, show measures agree by Lemma 3, hence L = 0. -/
 
+/-- Bridge: a positive linear functional on C(K,ℝ) (compact K) induces a
+    finite Borel measure via the Riesz–Markov–Kakutani theorem, and
+    integration against this measure recovers the functional. -/
+theorem positive_functional_to_measure
+    (Λ : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ) (hΛ : IsPositiveLinearFunctional Λ) :
+    ∃ (μ : Measure ↥(UnitCube n)), IsFiniteMeasure μ ∧
+      ∀ f : C(↥(UnitCube n), ℝ), Λ f = ∫ x, f x ∂μ := by
+  sorry -- Bridge C(K,ℝ) →L[ℝ] ℝ to C_c(K,ℝ) →ₚ[ℝ] ℝ (compact ⟹ C = C_c), apply RMK
+
 theorem neuralNet_annihilator_trivial
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ)
     (hL : ∀ g ∈ neuralNetRange σ hσ_cont, L g = 0) : L = 0 := by
-  sorry -- Combines riesz_decomposition + positive RMK + sigmoidal_measures_eq
+  -- Step 1: Decompose L = Lpos - Lneg where both are positive functionals
+  obtain ⟨Lpos, Lneg, hpos, hneg, hdecomp⟩ := riesz_decomposition L
+  -- Step 2: Convert positive functionals to measures via RMK
+  obtain ⟨μ₁, hfin₁, hint₁⟩ := positive_functional_to_measure Lpos hpos
+  obtain ⟨μ₂, hfin₂, hint₂⟩ := positive_functional_to_measure Lneg hneg
+  -- Step 3: L vanishes on neural nets ⟹ μ₁ and μ₂ agree on sigmoidal integrals
+  have h_agree : ∀ (w : Fin n → ℝ) (b : ℝ),
+      ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₁ =
+      ∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₂ := by
+    intro w b
+    -- Single neuron σ(⟨w,·⟩+b) is in the neural net range (N=1, α=1)
+    have hmem : neuralNetCMap σ hσ_cont 1 (fun _ => w) (fun _ => b) (fun _ => 1) ∈
+        neuralNetRange σ hσ_cont :=
+      ⟨1, fun _ => w, fun _ => b, fun _ => 1, rfl⟩
+    have hLzero := hL _ hmem
+    -- L g = Lpos g - Lneg g = 0  ⟹  Lpos g = Lneg g  ⟹  ∫ g dμ₁ = ∫ g dμ₂
+    -- The neuralNetCMap with N=1, α=1 evaluates to σ(⟨w,x⟩+b)
+    -- So hint₁/hint₂ convert Lpos/Lneg values to integrals, and hdecomp + hLzero give equality
+    let g := neuralNetCMap σ hσ_cont 1 (fun _ => w) (fun _ => b) (fun _ => 1)
+    have h1 : Lpos g = ∫ x, g x ∂μ₁ := hint₁ g
+    have h2 : Lneg g = ∫ x, g x ∂μ₂ := hint₂ g
+    have h3 : Lpos g = Lneg g := by linarith [hdecomp g]
+    -- Need: ∫ g dμᵢ = ∫ σ(⟨w,·⟩+b) dμᵢ (they're the same function)
+    have hg_eq : ∀ x : ↥(UnitCube n), g x = σ (∑ i, w i * (x : Fin n → ℝ) i + b) := by
+      intro x; simp [g, neuralNetCMap, neuralNetFun]
+    rw [show (∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₁) =
+            ∫ x, g x ∂μ₁ from by congr 1; ext x; exact (hg_eq x).symm,
+        show (∫ x, σ (∑ i, w i * (x : Fin n → ℝ) i + b) ∂μ₂) =
+            ∫ x, g x ∂μ₂ from by congr 1; ext x; exact (hg_eq x).symm]
+    linarith
+  -- Step 4: By sigmoidal_measures_eq, μ₁ = μ₂
+  have hμeq : μ₁ = μ₂ := sigmoidal_measures_eq σ hσ_cont hσ_sig μ₁ μ₂ h_agree
+  -- Step 5: L f = ∫f dμ₁ - ∫f dμ₂ = 0 for all f
+  ext f
+  simp only [ContinuousLinearMap.zero_apply]
+  rw [hdecomp f, hint₁ f, hint₂ f, hμeq, sub_self]
 
 /-! ## Lemma 5: Neural nets are dense
 
@@ -177,7 +243,6 @@ def neuralNetSubmodule (σ : ℝ → ℝ) (hσ : Continuous σ) :
 
 theorem neuralNet_dense (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ) :
     Dense (neuralNetRange (n := n) σ hσ_cont) := by
-  -- neuralNetRange is a submodule, so we can apply Hahn-Banach density
   have : (neuralNetRange σ hσ_cont : Set C(↥(UnitCube n), ℝ)) =
       ↑(neuralNetSubmodule σ hσ_cont : Submodule ℝ C(↥(UnitCube n), ℝ)) := by
     ext; simp [neuralNetSubmodule, neuralNetRange]
