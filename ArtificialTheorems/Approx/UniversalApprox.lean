@@ -132,7 +132,16 @@ theorem measures_eq_of_halfspaces
     (h : ∀ (w : Fin n → ℝ), μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
                               μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i}) :
     μ₁ = μ₂ := by
-  sorry -- π-system / Dynkin argument: half-spaces generate the Borel σ-algebra
+  -- Half-spaces {x | 0 < ⟨w,x⟩} form a subbasis for the topology, hence
+  -- generate the Borel σ-algebra. By the π-λ theorem, two finite measures
+  -- agreeing on a generating π-system (here: finite intersections of half-spaces)
+  -- with same total mass are equal.
+  -- The full proof requires:
+  -- 1. Half-spaces generate Borel σ-algebra on UnitCube
+  -- 2. Finite intersections of half-spaces form a π-system
+  -- 3. π-λ uniqueness theorem (Mathlib: MeasureTheory.Measure.ext_of_generateFrom_of_iUnion)
+  -- Each step needs significant Mathlib API work, sorry'd for now.
+  sorry
 
 /-- Scaling σ(λ⟨w,x⟩+b) as λ→∞ and applying BCT shows that two measures
     agreeing on all sigmoidal integrals agree on half-space measures. -/
@@ -146,8 +155,102 @@ theorem halfspaces_of_sigmoidal_integrals
     (w : Fin n → ℝ) :
     μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} =
     μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i} := by
-  sorry -- BCT: scale w↦λw with λ→∞, σ(λ⟨w,x⟩) → indicator, integrals converge
-
+  -- For each k, h (fun i => ↑k * w i) 0 gives ∫ σ(k⟨w,x⟩) dμ₁ = ∫ σ(k⟨w,x⟩) dμ₂
+  -- As k→∞, σ(k·t)→1 for t>0, σ(k·t)→0 for t<0, by IsSigmoidal.
+  -- σ is bounded (continuous + limits at ±∞), so BCT applies.
+  -- The limit integral equals the measure of {⟨w,x⟩ > 0} (up to null hyperplane).
+  -- Since limits of equal sequences are equal, μ₁{⟨w,x⟩>0} = μ₂{⟨w,x⟩>0}.
+  --
+  set ip := fun x : ↥(UnitCube n) => ∑ i, w i * (x : Fin n → ℝ) i with hip
+  -- Sub-lemma 1: σ is bounded
+  have hσ_bdd : ∃ C : ℝ, ∀ t, ‖σ t‖ ≤ C := by
+    -- σ → 1 at +∞ and σ → 0 at -∞, so bounded outside [-N,N].
+    -- σ continuous on compact [-N,N], so bounded there. Max of all bounds works.
+    -- Get bound at +∞: ∃ N₁, ∀ t ≥ N₁, |σ(t)| < 2
+    have h1 : ∀ᶠ t in atTop, ‖σ t‖ < 2 := by
+      have := hσ_sig.1.norm; rw [show ‖(1:ℝ)‖ = 1 from norm_one] at this
+      exact (this.eventually (gt_mem_nhds (by norm_num : (1:ℝ) < 2))).mono fun t ht => ht
+    -- Get bound at -∞: ∃ N₂, ∀ t ≤ N₂, |σ(t)| < 1
+    have h2 : ∀ᶠ t in atBot, ‖σ t‖ < 1 := by
+      have := hσ_sig.2.norm; rw [show ‖(0:ℝ)‖ = 0 from norm_zero] at this
+      exact (this.eventually (gt_mem_nhds (by norm_num : (0:ℝ) < 1))).mono fun t ht => ht
+    rw [Filter.eventually_atTop] at h1; rw [Filter.eventually_atBot] at h2
+    obtain ⟨N₁, hN₁⟩ := h1; obtain ⟨N₂, hN₂⟩ := h2
+    -- On [N₂-1, N₁+1], σ is continuous hence bounded. Outside, use tail bounds.
+    obtain ⟨M, hM⟩ := (isCompact_Icc.image hσ_cont.norm).isBounded.subset_closedBall 0
+    use max M 2
+    intro t
+    by_cases h_hi : N₁ ≤ t
+    · exact le_max_of_le_right (le_of_lt (hN₁ t h_hi))
+    · by_cases h_lo : t ≤ N₂
+      · exact le_max_of_le_right (le_of_lt (lt_of_lt_of_le (hN₂ t h_lo) one_le_two))
+      · push_neg at h_hi h_lo
+        have ht_mem : t ∈ Set.Icc (N₂ - 1) (N₁ + 1) :=
+          ⟨by linarith, by linarith⟩
+        have : ‖σ t‖ ∈ (fun x => ‖σ x‖) '' Set.Icc (N₂ - 1) (N₁ + 1) :=
+          Set.mem_image_of_mem _ ht_mem
+        have hmem := hM this
+        rw [Metric.mem_closedBall, Real.dist_eq] at hmem
+        rw [sub_zero] at hmem; exact le_max_of_le_left (le_trans (le_abs_self _) hmem)
+    -- Sub-lemma 2: pointwise convergence σ(k·t) → indicator
+  have h_pw : ∀ t : ℝ, t ≠ 0 →
+      Tendsto (fun k : ℕ => σ (↑k * t)) atTop (𝓝 (if 0 < t then 1 else 0)) := by
+    intro t ht
+    rcases lt_or_gt_of_ne ht with ht_neg | ht_pos
+    · simp [not_lt.mpr (le_of_lt ht_neg)]
+      have : Tendsto (fun k : ℕ => (↑k : ℝ) * t) atTop atBot :=
+        tendsto_natCast_atTop_atTop.atTop_mul_const_of_neg' ht_neg
+      exact hσ_sig.2.comp this
+    · simp [ht_pos]
+      have : Tendsto (fun k : ℕ => (↑k : ℝ) * t) atTop atTop :=
+        tendsto_natCast_atTop_atTop.atTop_mul_const' ht_pos
+      exact hσ_sig.1.comp this
+  -- Sub-lemma 3: Apply BCT to derive integral identities
+  -- For any b, scaling w by λ→∞ in σ(λ⟨w,x⟩+b) gives:
+  --   μᵢ{ip>0} + σ(b)·μᵢ{ip=0} is the same for i=1,2
+  have h_bct : ∀ b : ℝ,
+      (μ₁ {x | 0 < ip x}).toReal + σ b * (μ₁ {x | ip x = 0}).toReal =
+      (μ₂ {x | 0 < ip x}).toReal + σ b * (μ₂ {x | ip x = 0}).toReal := by
+    intro b
+    -- Define F_k(x) = σ(k · ip(x) + b) and limit function
+    set F : ℕ → ↥(UnitCube n) → ℝ := fun k x => σ (↑k * ip x + b)
+    set f_lim : ↥(UnitCube n) → ℝ := fun x =>
+        if 0 < ip x then 1 else if ip x = 0 then σ b else 0
+    -- BCT hypothesis 1: equal integrals
+    have h_eq_k : ∀ k : ℕ, ∫ x, F k x ∂μ₁ = ∫ x, F k x ∂μ₂ := by
+      intro k
+      have := h (fun i => ↑k * w i) b
+      convert this using 2 <;> ext x <;> simp [F, ip, Finset.mul_sum, mul_assoc]
+    -- The BCT argument: σ(k⟨w,x⟩+b) → f_lim pointwise, bounded by C,
+    -- so ∫ σ(k⟨w,x⟩+b) dμᵢ → ∫ f_lim dμᵢ, and ∫ f_lim dμᵢ = μᵢ{ip>0} + σ(b)·μᵢ{ip=0}.
+    -- Detailed formalization of BCT + integral decomposition sorry'd.
+    sorry
+  -- Sub-lemma 4: Algebraic conclusion
+  -- h_bct for varying b gives: d_pos + σ(b) · d_zero = 0 for all b.
+  -- Since σ is not constant (limits 0 and 1), d_zero = 0, hence d_pos = 0.
+  set d_pos := (μ₁ {x | 0 < ip x}).toReal - (μ₂ {x | 0 < ip x}).toReal
+  set d_zero := (μ₁ {x | ip x = 0}).toReal - (μ₂ {x | ip x = 0}).toReal
+  have h_eq_all : ∀ b : ℝ, d_pos + σ b * d_zero = 0 := by
+    intro b; have := h_bct b; simp [d_pos, d_zero]; linarith
+  have hd_zero : d_zero = 0 := by
+    by_contra hne
+    -- σ(b) = -d_pos / d_zero for all b, so σ is constant
+    have hconst : ∀ b : ℝ, σ b = -d_pos / d_zero := by
+      intro b; have := h_eq_all b
+      field_simp at this ⊢; linarith
+    -- But σ → 1 at +∞ and σ → 0 at -∞, contradiction
+    have h1 : σ 0 = -d_pos / d_zero := hconst 0
+    have h2' : σ 0 = -d_pos / d_zero := hconst 0
+    have hlim1 := tendsto_nhds_unique hσ_sig.1 (tendsto_const_nhds (x := -d_pos / d_zero) |>.congr (fun n => (hconst n).symm))
+    have hlim2 := tendsto_nhds_unique hσ_sig.2 (tendsto_const_nhds (x := -d_pos / d_zero) |>.congr (fun n => (hconst n).symm))
+    linarith
+  have hd_pos : d_pos = 0 := by have := h_eq_all 0; simp [hd_zero] at this; exact this
+  -- Convert from toReal equality to ENNReal equality
+  have hfin₁ : (μ₁ {x | 0 < ip x}) ≠ ⊤ := (measure_ne_top μ₁ _)
+  have hfin₂ : (μ₂ {x | 0 < ip x}) ≠ ⊤ := (measure_ne_top μ₂ _)
+  have htr : (μ₁ {x | 0 < ip x}).toReal = (μ₂ {x | 0 < ip x}).toReal := by
+    simp [d_pos] at hd_pos; linarith
+  rwa [ENNReal.toReal_eq_toReal_iff' hfin₁ hfin₂] at htr
 theorem sigmoidal_measures_eq
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (μ₁ μ₂ : Measure (↥(UnitCube n)))
@@ -172,7 +275,29 @@ theorem positive_functional_to_measure
     (Λ : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ) (hΛ : IsPositiveLinearFunctional Λ) :
     ∃ (μ : Measure ↥(UnitCube n)), IsFiniteMeasure μ ∧
       ∀ f : C(↥(UnitCube n), ℝ), Λ f = ∫ x, f x ∂μ := by
-  sorry -- Bridge C(K,ℝ) →L[ℝ] ℝ to C_c(K,ℝ) →ₚ[ℝ] ℝ (compact ⟹ C = C_c), apply RMK
+  -- Bridge C(K,ℝ) →L[ℝ] ℝ to C_c(K,ℝ) →ₚ[ℝ] ℝ (compact ⟹ C = C_c), apply RMK
+  -- Define the lifting from C_c to C: just forget compact support
+  let toC : CompactlySupportedContinuousMap ↥(UnitCube n) ℝ →ₗ[ℝ]
+            C(↥(UnitCube n), ℝ) :=
+    { toFun := fun f => f.toContinuousMap
+      map_add' := fun f g => rfl
+      map_smul' := fun r f => rfl }
+  -- Compose to get a linear map on C_c
+  let Λ_lin := Λ.toLinearMap.comp toC
+  -- It's positive because Λ is positive
+  let Λ_cc : CompactlySupportedContinuousMap ↥(UnitCube n) ℝ →ₚ[ℝ] ℝ :=
+    PositiveLinearMap.mk₀ Λ_lin (by
+      intro f hf
+      exact hΛ f.toContinuousMap (fun x => hf x))
+  refine ⟨RealRMK.rieszMeasure Λ_cc, inferInstance, fun f => ?_⟩
+  -- Use RMK integral theorem
+  let f_cc : CompactlySupportedContinuousMap ↥(UnitCube n) ℝ :=
+    ⟨f, HasCompactSupport.of_compactSpace f⟩
+  have h := RealRMK.integral_rieszMeasure Λ_cc f_cc
+  -- h : ∫ x, f_cc x ∂(rieszMeasure Λ_cc) = Λ_cc f_cc
+  -- Λ_cc f_cc = Λ f by definition
+  -- ∫ f_cc = ∫ f because they're the same function
+  exact h.symm
 
 theorem neuralNet_annihilator_trivial
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
