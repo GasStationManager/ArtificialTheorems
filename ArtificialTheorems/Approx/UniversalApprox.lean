@@ -69,7 +69,33 @@ theorem dense_of_forall_dual_vanish_eq_zero
   -- with L(a) < u for a ∈ closure(S) and u < L(g). For s ∈ S, r • s ∈ S
   -- for all r, so r * L(s) < u for all r, forcing L(s) = 0.
   -- But h says L = 0, contradicting L(g) > 0.
-  sorry -- Hahn-Banach argument; all Mathlib ingredients exist
+  rw [dense_iff_closure_eq]
+  by_contra h_ne
+  have ⟨g, hg⟩ : ∃ g, g ∉ closure (S : Set E) := by
+    by_contra h_all; push_neg at h_all
+    exact h_ne (Set.eq_univ_of_forall h_all)
+  obtain ⟨L, u, hL_bd, hL_g⟩ :=
+    geometric_hahn_banach_closed_point S.convex.closure isClosed_closure hg
+  have hL_vanish : ∀ s ∈ (S : Set E), L s = 0 := by
+    intro s hs
+    by_contra hs_ne
+    have bound : ∀ (r : ℝ), r * L s < u := by
+      intro r
+      have hmem : r • s ∈ closure (S : Set E) := subset_closure (S.smul_mem r hs)
+      have := hL_bd _ hmem
+      rwa [L.map_smul, smul_eq_mul] at this
+    rcases lt_or_gt_of_ne hs_ne with hlt | hgt
+    · have h1 := bound ((u + 1) / L s)
+      rw [div_mul_cancel₀ _ (ne_of_lt hlt)] at h1
+      linarith
+    · have h1 := bound ((u + 1) / L s)
+      rw [div_mul_cancel₀ _ (ne_of_gt hgt)] at h1
+      linarith
+  have hL_zero := h L hL_vanish
+  have h0 := hL_bd 0 (subset_closure S.zero_mem)
+  rw [hL_zero] at hL_g h0
+  simp at hL_g h0
+  linarith
 
 /-! ## Lemma 2: Positive decomposition of functionals (sorry'd)
 
@@ -127,11 +153,37 @@ theorem neuralNet_annihilator_trivial
 
 Combines Lemma 1 (Hahn-Banach density) with Lemma 4 (trivial annihilator). -/
 
+/-- neuralNetRange is a submodule: it contains 0, and is closed under
+    addition (concatenate networks) and scalar multiplication (scale coefficients). -/
+def neuralNetSubmodule (σ : ℝ → ℝ) (hσ : Continuous σ) :
+    Submodule ℝ C(↥(UnitCube n), ℝ) where
+  carrier := neuralNetRange σ hσ
+  zero_mem' := ⟨0, Fin.elim0, Fin.elim0, Fin.elim0, by
+    ext x; simp [neuralNetCMap, neuralNetFun]⟩
+  add_mem' := by
+    rintro _ _ ⟨N₁, w₁, b₁, α₁, rfl⟩ ⟨N₂, w₂, b₂, α₂, rfl⟩
+    exact ⟨N₁ + N₂, Fin.append w₁ w₂, Fin.append b₁ b₂, Fin.append α₁ α₂, by
+      ext x; simp only [neuralNetCMap, neuralNetFun, ContinuousMap.coe_mk,
+        ContinuousMap.coe_add, Pi.add_apply]
+      rw [Fin.sum_univ_add]
+      congr 1 <;> apply Finset.sum_congr rfl <;> intro i _ <;>
+        simp [Fin.append]⟩
+  smul_mem' := by
+    rintro r _ ⟨N, w, b, α, rfl⟩
+    exact ⟨N, w, b, fun j => r * α j, by
+      ext x; simp only [neuralNetCMap, neuralNetFun, ContinuousMap.coe_mk,
+        ContinuousMap.coe_smul, Pi.smul_apply, smul_eq_mul]
+      rw [Finset.mul_sum]; congr 1; ext j; ring⟩
+
 theorem neuralNet_dense (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ) :
     Dense (neuralNetRange (n := n) σ hσ_cont) := by
-  -- The span is dense (Hahn-Banach + trivial annihilator).
-  -- neuralNetRange is a linear subspace = its own span, hence dense.
-  sorry
+  -- neuralNetRange is a submodule, so we can apply Hahn-Banach density
+  have : (neuralNetRange σ hσ_cont : Set C(↥(UnitCube n), ℝ)) =
+      ↑(neuralNetSubmodule σ hσ_cont : Submodule ℝ C(↥(UnitCube n), ℝ)) := by
+    ext; simp [neuralNetSubmodule, neuralNetRange]
+  rw [this]
+  exact dense_of_forall_dual_vanish_eq_zero _ (fun L hL =>
+    neuralNet_annihilator_trivial σ hσ_cont hσ_sig L (fun g hg => hL g hg))
 
 /-! ## Main theorem: density → uniform approximation -/
 
