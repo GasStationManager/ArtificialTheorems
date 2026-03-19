@@ -7,10 +7,10 @@ Architecture:
 - sigmoidal_measures_eq: BCT + π-λ (decomposed into sub-lemmas)
 - neuralNet_annihilator_trivial: combines decomposition + measures (structured proof)
 - neuralNet_dense: combines Hahn-Banach + annihilator
-- universal_approximation_cybenko': density → uniform approximation (proved)
+- universal_approximation_cybenko: density → uniform approximation (proved)
 -/
 
-import ArtificialTheoremsSpec.Approx.UniversalApproxSpec
+import Mathlib
 
 open MeasureTheory Topology ContinuousMap Set Filter Finset
 
@@ -19,6 +19,23 @@ open scoped NNReal ENNReal
 noncomputable section
 
 variable {n : ℕ}
+
+-- The unit hypercube Iₙ = [0,1]ⁿ
+def UnitCube (n : ℕ) : Set (Fin n → ℝ) :=
+  Set.pi Set.univ (fun _ => Set.Icc 0 1)
+
+/-- A single-hidden-layer neural network function on ℝⁿ:
+    x ↦ ∑ⱼ αⱼ · σ(⟨wⱼ, x⟩ + bⱼ) -/
+def neuralNetFun (σ : ℝ → ℝ) (N : ℕ)
+    (w : Fin N → (Fin n → ℝ))
+    (b : Fin N → ℝ)
+    (α : Fin N → ℝ)
+    (x : Fin n → ℝ) : ℝ :=
+  ∑ j : Fin N, α j * σ (∑ i : Fin n, w j i * x i + b j)
+
+/-- σ : ℝ → ℝ is sigmoidal if σ(t) → 1 as t → +∞ and σ(t) → 0 as t → −∞. -/
+def IsSigmoidal (σ : ℝ → ℝ) : Prop :=
+  Tendsto σ atTop (nhds 1) ∧ Tendsto σ atBot (nhds 0)
 
 /-! ## UnitCube properties -/
 
@@ -93,111 +110,28 @@ theorem dense_of_forall_dual_vanish_eq_zero
   simp at hL_g h0
   linarith
 
-/-! ## Lemma 2: Positive decomposition of functionals
+/-! ## Lemma 2: Jordan decomposition (HasJordanDecomposition)
 
-### Statement (informal)
+Every continuous linear functional on C(K,ℝ) for compact Hausdorff K is the
+difference of two positive continuous linear functionals.
 
-For any compact Hausdorff space K, every continuous linear functional
-L : C(K,ℝ) → ℝ can be written as L = L⁺ - L⁻ where L⁺ and L⁻ are
-*positive* continuous linear functionals (i.e., L⁺(f) ≥ 0 whenever f ≥ 0).
-
-### Proof sketch (from the literature)
-
-There are two standard proof routes:
-
-**Route A (via Riesz–Markov–Kakutani):**
-1. By the positive RMK theorem, every *positive* linear functional Λ on
-   C(K,ℝ) is represented by a unique regular Borel measure μ:
-     Λ(f) = ∫ f dμ.
-2. The signed version of RMK (Rudin, RCA Thm 6.19; Folland, Real Analysis
-   Thm 7.17) extends this: every *bounded* linear functional L on C(K,ℝ)
-   is represented by a unique signed regular Borel measure ν:
-     L(f) = ∫ f dν,    ‖L‖ = |ν|(K).
-3. By the Jordan decomposition of signed measures, ν = ν⁺ - ν⁻ where
-   ν⁺, ν⁻ are positive measures.
-4. Define L⁺(f) := ∫ f dν⁺ and L⁻(f) := ∫ f dν⁻. These are positive
-   continuous linear functionals and L = L⁺ - L⁻.
-
-**Route B (lattice-theoretic, via the order structure of C(K)*):**
-1. C(K,ℝ) is a Banach lattice (with pointwise ordering and the sup norm).
-   It is an AM-space with unit (the constant function 1).
-2. By the Kakutani representation theorem, the dual C(K,ℝ)* is an AL-space,
-   hence an order-complete Banach lattice.
-3. In any Banach lattice, every element x decomposes as x = x⁺ - x⁻
-   where x⁺ = x ∨ 0 and x⁻ = (-x) ∨ 0.
-4. The lattice positive part L⁺ coincides with the functional defined by
-     L⁺(f) = sup { L(g) : 0 ≤ g ≤ f }    for f ≥ 0
-   which is indeed a positive continuous linear functional.
-
-### References
-
-• **Rudin, "Real and Complex Analysis" (3rd ed., 1987), Theorem 6.19:**
-  States that C₀(X)* ≅ M(X) (signed regular Borel measures) for locally
-  compact Hausdorff X, with ‖L‖ = |μ|(X). For compact K, C₀(K) = C(K).
-  The decomposition L = L⁺ - L⁻ then follows from Jordan decomposition
-  of the representing measure (Rudin, Thm 6.12).
-
-• **Aliprantis & Border, "Infinite Dimensional Analysis" (3rd ed., 2006):**
-  - Thm 9.11: The order dual of C(K) equals its topological dual.
-  - Thm 9.14: C(K)* is a Banach lattice (in fact an AL-space).
-  - Thm 8.48: In any vector lattice, x = x⁺ - x⁻ (Jordan decomposition).
-  - §9.4: Connects the lattice decomposition to the measure decomposition.
-
-• **Conway, "A Course in Functional Analysis" (2nd ed., 1990), §V.8:**
-  Discusses C(K)* as the space of regular Borel measures.
-
-• **Folland, "Real Analysis" (2nd ed., 1999), Theorem 7.17:**
-  Riesz representation for signed/complex measures on locally compact spaces.
-
-• **Wikipedia, "Riesz–Markov–Kakutani representation theorem":**
-  "One can deduce [the signed version] from the statement about positive
-  linear functionals by first showing that a bounded linear functional
-  can be written as a finite linear combination of positive ones."
-
-### Lean formalization status
-
-Not in Mathlib v4.27.0. The gap is structural:
-- Mathlib has the *positive* RMK: `RealRMK.rieszMeasure` gives μ from a
-  positive functional Λ, and `RealRMK.integral_rieszMeasure` proves
-  Λ(f) = ∫ f dμ. (See `Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real`.)
-- Mathlib has `SignedMeasure` with `JordanDecomposition` (Hahn decomposition,
-  Jordan decomposition, mutually singular positive/negative parts).
-  (See `Mathlib.MeasureTheory.VectorMeasure.Decomposition.Jordan`.)
-- What is MISSING: the signed/general version of RMK that maps an arbitrary
-  (not necessarily positive) bounded linear functional to a signed measure.
-  There is no `BanachLattice` class, no lattice structure on `ContinuousLinearMap`,
-  and no `C(K)* ≅ M(K)` isomorphism for signed measures.
-
-Closing this gap would require either:
-(a) Building the signed RMK (L ↦ signed measure) from the positive RMK +
-    Jordan decomposition, or
-(b) Building the Banach lattice structure on C(K)* and using the abstract
-    decomposition x = x⁺ - x⁻.
-
-Either route is a substantial Mathlib contribution (~500-1000 LOC). We instead
-formulate the result as `HasJordanDecomposition`, a `Prop` assumed as a
-hypothesis to the main theorem. -/
+This classical result (Rudin RCA Thms 6.19 + 6.12; Aliprantis & Border
+Thms 9.11, 9.14, 8.48; Conway §V.8; Folland Thm 7.17) is not in Mathlib
+v4.27.0 (no BanachLattice class, no signed RMK). We assume it as a premise.
+See the spec file for additional documentation. -/
 
 def IsPositiveLinearFunctional
     (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ) : Prop :=
   ∀ f : C(↥(UnitCube n), ℝ), (∀ x, 0 ≤ f x) → 0 ≤ L f
 
-/-- **Jordan decomposition of continuous linear functionals on C(Iₙ,ℝ).**
-
-    For the unit hypercube Iₙ = [0,1]ⁿ (a compact Hausdorff space), every
-    continuous linear functional L : C(Iₙ,ℝ) → ℝ is the difference of two
-    positive continuous linear functionals: L = L⁺ - L⁻.
-
-    This is a consequence of the Riesz–Markov–Kakutani representation theorem
-    (signed version) composed with the Jordan decomposition of signed measures.
-    See the docstring of the enclosing section for a detailed proof sketch,
-    references, and discussion of the Mathlib gap. -/
+/-- Jordan decomposition of continuous linear functionals on C(Iₙ,ℝ). -/
 def HasJordanDecomposition (n : ℕ) : Prop :=
   ∀ (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ),
     ∃ (Lpos Lneg : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ),
       IsPositiveLinearFunctional Lpos ∧
       IsPositiveLinearFunctional Lneg ∧
       ∀ f, L f = Lpos f - Lneg f
+
 
 /-! ## Lemma 3: Sigmoidal measure uniqueness
 
@@ -636,7 +570,7 @@ theorem neuralNet_dense (hJD : HasJordanDecomposition n)
 /-- **Cybenko's Universal Approximation Theorem (1989).**
     Neural networks with a single hidden layer and continuous sigmoidal
     activation can uniformly approximate any continuous function on [0,1]ⁿ. -/
-theorem universal_approximation_cybenko'
+theorem universal_approximation_cybenko
     (hJD : HasJordanDecomposition n)
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (f : (Fin n → ℝ) → ℝ) (hf_cont : ContinuousOn f (UnitCube n))
