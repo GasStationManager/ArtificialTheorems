@@ -3,7 +3,7 @@ Universal Approximation Theorem (Cybenko 1989) - Proof
 
 Architecture:
 - dense_of_forall_dual_vanish_eq_zero: Hahn-Banach density (Mathlib ingredients exist)
-- riesz_decomposition: L = L⁺ - L⁻ (sorry — Banach lattice, not in Mathlib)
+- HasJordanDecomposition: L = L⁺ - L⁻ (assumed as premise — classical, not in Mathlib)
 - sigmoidal_measures_eq: BCT + π-λ (decomposed into sub-lemmas)
 - neuralNet_annihilator_trivial: combines decomposition + measures (structured proof)
 - neuralNet_dense: combines Hahn-Banach + annihilator
@@ -105,13 +105,28 @@ def IsPositiveLinearFunctional
     (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ) : Prop :=
   ∀ f : C(↥(UnitCube n), ℝ), (∀ x, 0 ≤ f x) → 0 ≤ L f
 
-theorem riesz_decomposition
-    (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ) :
+/-- **Jordan decomposition of functionals on C(K,ℝ).**
+    Every continuous linear functional on C(K,ℝ) for compact Hausdorff K
+    is the difference of two positive continuous linear functionals.
+
+    This is a classical result following from C(K) being an AM-space with unit
+    whose dual is an AL-space (hence a Banach lattice with the Riesz decomposition
+    property).
+
+    References:
+    • Aliprantis & Border, "Infinite Dimensional Analysis", 3rd ed., Theorems 9.11, 9.14
+    • Rudin, "Real and Complex Analysis", Theorem 6.19
+    • Conway, "A Course in Functional Analysis", Chapter V
+
+    Not in Mathlib v4.27.0 (no BanachLattice class, no lattice structure on
+    ContinuousLinearMap). This is assumed as a hypothesis and propagated to
+    the main theorem. -/
+def HasJordanDecomposition (n : ℕ) : Prop :=
+  ∀ (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ),
     ∃ (Lpos Lneg : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ),
       IsPositiveLinearFunctional Lpos ∧
       IsPositiveLinearFunctional Lneg ∧
-      ∀ f, L f = Lpos f - Lneg f := by
-  sorry -- Banach lattice decomposition
+      ∀ f, L f = Lpos f - Lneg f
 
 /-! ## Lemma 3: Sigmoidal measure uniqueness
 
@@ -133,12 +148,84 @@ theorem measures_eq_of_halfspaces
       μ₁ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + b} =
       μ₂ {x | 0 < ∑ i, w i * (x : Fin n → ℝ) i + b}) :
     μ₁ = μ₂ := by
-  -- We push both measures to the ambient Euclidean space `(Fin n → ℝ)` and use
-  -- one-dimensional half-space equality along every linear functional to show that
-  -- all one-dimensional projections agree. Equality of characteristic functions
-  -- then gives equality of the ambient pushforwards, hence of the original
-  -- measures on the subtype.
-  sorry
+  -- Strategy: push forward to ℝ via each linear functional φ_w, show pushforwards
+  -- agree via ext_of_generate_finite with the Ioi π-system, then lift back.
+  -- Step 0: Total mass agrees (w = 0, b = 1 gives univ)
+  have h_univ : μ₁ Set.univ = μ₂ Set.univ := by
+    have := h 0 1
+    simp only [Pi.zero_apply, zero_mul, Finset.sum_const_zero, zero_add, zero_lt_one,
+      Set.setOf_true] at this
+    exact this
+  -- Step 1: For each w, the 1-d pushforward measures on ℝ agree
+  set φ : (Fin n → ℝ) → ↥(UnitCube n) → ℝ :=
+    fun w x => ∑ i, w i * (x : Fin n → ℝ) i with hφ_def
+  have hφ_meas : ∀ w, Measurable (φ w) :=
+    fun w => (continuous_finset_sum _ fun i _ =>
+      continuous_const.mul ((continuous_apply i).comp continuous_subtype_val)).measurable
+  have h_map_eq : ∀ w : Fin n → ℝ, μ₁.map (φ w) = μ₂.map (φ w) := by
+    intro w
+    apply ext_of_generate_finite (range Set.Ioi)
+      (BorelSpace.measurable_eq.trans (borel_eq_generateFrom_Ioi ℝ))
+      isPiSystem_Ioi
+    · rintro s ⟨r, rfl⟩
+      rw [Measure.map_apply (hφ_meas w) measurableSet_Ioi,
+          Measure.map_apply (hφ_meas w) measurableSet_Ioi]
+      have key := h w (-r)
+      have : φ w ⁻¹' Set.Ioi r =
+          {x : ↥(UnitCube n) | 0 < ∑ i, w i * (x : Fin n → ℝ) i + -r} := by
+        ext x
+        simp only [Set.mem_preimage, Set.mem_Ioi, Set.mem_setOf_eq, φ]
+        constructor
+        · intro h; linarith
+        · intro h; linarith
+      simp only [this]; exact key
+    · rw [Measure.map_apply (hφ_meas w) MeasurableSet.univ,
+          Measure.map_apply (hφ_meas w) MeasurableSet.univ]
+      simp [h_univ]
+  -- Step 2: Push both measures to (Fin n → ℝ) via Subtype.val, show charFunDual agrees.
+  set ι : ↥(UnitCube n) → (Fin n → ℝ) := Subtype.val with hι_def
+  have hι_me : MeasurableEmbedding ι :=
+    MeasurableEmbedding.subtype_coe ((measurableSet_pi Set.countable_univ |>.mpr (Or.inl (fun i _ => measurableSet_Icc))))
+  set ν₁ := μ₁.map ι with hν₁_def
+  set ν₂ := μ₂.map ι with hν₂_def
+  -- Any continuous linear functional on (Fin n → ℝ) composes with ι to give φ w
+  have h_decomp : ∀ (L : (Fin n → ℝ) →L[ℝ] ℝ),
+      (L ∘ ι) = φ (fun i => L (Pi.single i 1)) := by
+    intro L; ext x; simp only [Function.comp, φ]
+    have key : ∀ (v : Fin n → ℝ), L v = ∑ i : Fin n, v i * L (Pi.single i 1) := by
+      intro v
+      have hv : v = ∑ i : Fin n, v i • (Pi.single i 1 : Fin n → ℝ) := by
+        ext j; simp [Finset.sum_apply, Pi.single_apply, Finset.sum_ite_eq']
+      conv_lhs => rw [hv]
+      rw [map_sum]; congr 1; ext i
+      rw [ContinuousLinearMap.map_smul, smul_eq_mul]
+    rw [key]; congr 1; ext i; ring
+  -- ν₁.map L = ν₂.map L for all continuous linear L
+  have h_map_L : ∀ (L : (Fin n → ℝ) →L[ℝ] ℝ), ν₁.map L = ν₂.map L := by
+    intro L
+    have h1 : ν₁.map L = μ₁.map (L ∘ ι) := by
+      rw [hν₁_def, Measure.map_map L.measurable hι_me.measurable]
+    have h2 : ν₂.map L = μ₂.map (L ∘ ι) := by
+      rw [hν₂_def, Measure.map_map L.measurable hι_me.measurable]
+    rw [h1, h2, h_decomp L]
+    exact h_map_eq _
+  -- charFunDual ν₁ = charFunDual ν₂
+  have hcf : charFunDual ν₁ = charFunDual ν₂ := by
+    ext L
+    rw [charFunDual_eq_charFun_map_one, charFunDual_eq_charFun_map_one]
+    congr 1
+    exact h_map_L L
+  -- By ext_of_charFunDual, ν₁ = ν₂
+  have hν_eq : ν₁ = ν₂ := Measure.ext_of_charFunDual hcf
+  -- Since ι is a measurable embedding, μ₁ = μ₂
+  ext t ht
+  have h1 : μ₁ t = ν₁ (ι '' t) := by
+    rw [hν₁_def, hι_me.map_apply]; congr 1
+    exact (Set.preimage_image_eq t Subtype.val_injective).symm
+  have h2 : μ₂ t = ν₂ (ι '' t) := by
+    rw [hν₂_def, hι_me.map_apply]; congr 1
+    exact (Set.preimage_image_eq t Subtype.val_injective).symm
+  rw [h1, h2, hν_eq]
 
 /-- Scaling σ(λ⟨w,x⟩+b) as λ→∞ and applying BCT shows that two measures
     agreeing on all sigmoidal integrals agree on affine half-space measures. -/
@@ -396,11 +483,12 @@ theorem positive_functional_to_measure
   exact h.symm
 
 theorem neuralNet_annihilator_trivial
+    (hJD : HasJordanDecomposition n)
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (L : C(↥(UnitCube n), ℝ) →L[ℝ] ℝ)
     (hL : ∀ g ∈ neuralNetRange σ hσ_cont, L g = 0) : L = 0 := by
   -- Step 1: Decompose L = Lpos - Lneg where both are positive functionals
-  obtain ⟨Lpos, Lneg, hpos, hneg, hdecomp⟩ := riesz_decomposition L
+  obtain ⟨Lpos, Lneg, hpos, hneg, hdecomp⟩ := hJD L
   -- Step 2: Convert positive functionals to measures via RMK
   obtain ⟨μ₁, hfin₁, hint₁⟩ := positive_functional_to_measure Lpos hpos
   obtain ⟨μ₂, hfin₂, hint₂⟩ := positive_functional_to_measure Lneg hneg
@@ -462,14 +550,15 @@ def neuralNetSubmodule (σ : ℝ → ℝ) (hσ : Continuous σ) :
         ContinuousMap.coe_smul, Pi.smul_apply, smul_eq_mul]
       rw [Finset.mul_sum]; congr 1; ext j; ring⟩
 
-theorem neuralNet_dense (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ) :
+theorem neuralNet_dense (hJD : HasJordanDecomposition n)
+    (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ) :
     Dense (neuralNetRange (n := n) σ hσ_cont) := by
   have : (neuralNetRange σ hσ_cont : Set C(↥(UnitCube n), ℝ)) =
       ↑(neuralNetSubmodule σ hσ_cont : Submodule ℝ C(↥(UnitCube n), ℝ)) := by
     ext; simp [neuralNetSubmodule, neuralNetRange]
   rw [this]
   exact dense_of_forall_dual_vanish_eq_zero _ (fun L hL =>
-    neuralNet_annihilator_trivial σ hσ_cont hσ_sig L (fun g hg => hL g hg))
+    neuralNet_annihilator_trivial hJD σ hσ_cont hσ_sig L (fun g hg => hL g hg))
 
 /-! ## Main theorem: density → uniform approximation -/
 
@@ -477,13 +566,14 @@ theorem neuralNet_dense (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig :
     Neural networks with a single hidden layer and continuous sigmoidal
     activation can uniformly approximate any continuous function on [0,1]ⁿ. -/
 theorem universal_approximation_cybenko'
+    (hJD : HasJordanDecomposition n)
     (σ : ℝ → ℝ) (hσ_cont : Continuous σ) (hσ_sig : IsSigmoidal σ)
     (f : (Fin n → ℝ) → ℝ) (hf_cont : ContinuousOn f (UnitCube n))
     (ε : ℝ) (hε : 0 < ε) :
     ∃ (N : ℕ) (w : Fin N → (Fin n → ℝ)) (b : Fin N → ℝ) (α : Fin N → ℝ),
       ∀ x ∈ UnitCube n,
         |f x - neuralNetFun σ N w b α x| < ε := by
-  have h_dense : Dense (neuralNetRange (n := n) σ hσ_cont) := neuralNet_dense σ hσ_cont hσ_sig
+  have h_dense : Dense (neuralNetRange (n := n) σ hσ_cont) := neuralNet_dense hJD σ hσ_cont hσ_sig
   let g : C(↥(UnitCube n), ℝ) := ⟨fun x => f x, hf_cont.restrict⟩
   obtain ⟨nn, ⟨N, w, b, α, rfl⟩, h_dist⟩ := h_dense.exists_dist_lt g hε
   refine ⟨N, w, b, α, fun x hx => ?_⟩
