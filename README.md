@@ -35,7 +35,7 @@ This repo is a library of Lean 4 formalizations of theoretical foundations of AI
 5. **Annihilator triviality** — composing all steps
 6. **Main theorem** — density → uniform approximation
 
-**Cited premise (not proved in Lean):** The main theorem assumes `HasJordanDecomposition n` as a hypothesis — that every continuous linear functional on C([0,1]ⁿ, ℝ) is the difference of two positive continuous linear functionals. This is a classical result from functional analysis, verified by [DANA](https://github.com/GasStationManager/DANA) citation research at HIGH confidence:
+**Cited premise (not proved in Lean):** The main theorem assumes `HasJordanDecomposition n` as a hypothesis — that every continuous linear functional on C([0,1]ⁿ, ℝ) is the difference of two positive continuous linear functionals. This is a classical result from functional analysis:
 
 > **Jordan decomposition of functionals on C(K, ℝ).** Follows from the signed Riesz–Markov–Kakutani representation theorem (every bounded linear functional L on C(K, ℝ) is represented by a signed regular Borel measure ν; Rudin, *Real and Complex Analysis*, 3rd ed., Thm 6.19) composed with the Jordan decomposition of signed measures (ν = ν⁺ − ν⁻; Rudin, Thm 6.12). Equivalently, C(K)* is a Banach lattice (Aliprantis & Border, *Infinite Dimensional Analysis*, 3rd ed., Thms 9.11, 9.14). Not in Mathlib v4.27.0 — no `BanachLattice` class, no signed RMK.
 
