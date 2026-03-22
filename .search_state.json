@@ -1,0 +1,26 @@
+{
+  "active_tree_id": "eval_verina_basic_1_1774208438",
+  "trees": {
+    "eval_verina_basic_1_1774208438": {
+      "active": false,
+      "nodes": [],
+      "current_path": [],
+      "history": [],
+      "parent_map": {},
+      "edge_actions": {},
+      "root_branch": "main",
+      "search_id": "eval_verina_basic_1_1774208438",
+      "git_action_branches": {},
+      "tree_type": "and_or",
+      "metadata": {
+        "show_path": false,
+        "model": null,
+        "reuse_action_branches": false,
+        "tree_type": "and_or",
+        "enable_memory": true,
+        "created_at": "now",
+        "meta": "See /home/albertjiang/GS/ArtificialTheorems/.search_memory/eval_verina_basic_1_1774208438/META.md"
+      }
+    }
+  }
+}
