@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "pantograph-tree": {
+      "command": "/home/albertjiang/GS/PantographTree/run_mcp.sh"
+    }
+  }
+}
