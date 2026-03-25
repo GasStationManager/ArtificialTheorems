@@ -47,7 +47,7 @@ theorem gd_in_row_space' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (�
   induction k with
   | zero =>
     use 0
-    simp [gdSeq, dotProduct]
+    simp [gdSeq]
   | succ k ih =>
     obtain ⟨α, hα⟩ := ih
     exact gdIter_in_row_space X y η _ α hα
@@ -130,7 +130,7 @@ lemma alphaLimit_fixed_point (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ
     (hX : X.rank = n) :
     (iterMatrix X η).mulVec (alphaLimit X y) + η • y = alphaLimit X y := by
   simp only [iterMatrix, alphaLimit]
-  rw [sub_mulVec, one_mulVec, Matrix.smul_mulVec_assoc, mulVec_mulVec,
+  rw [sub_mulVec, one_mulVec, Matrix.smul_mulVec, mulVec_mulVec,
     mul_nonsing_inv _ (xxT_invertible X hX), one_mulVec]
   simp [sub_add_cancel]
 
