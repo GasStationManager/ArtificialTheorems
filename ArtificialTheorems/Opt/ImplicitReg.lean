@@ -158,10 +158,13 @@ theorem gdSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η :
     (hnd : n < d) (hX : X.rank = n)
     (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
     Tendsto (gdSeq X y η) atTop (nhds (minNormSol X y)) := by
-  -- gdSeq = Xᵀ ∘ alphaSeq, and Xᵀ.mulVec is continuous
-  -- alphaSeq → alphaLimit = (XXᵀ)⁻¹ y
-  -- so gdSeq → Xᵀ (XXᵀ)⁻¹ y = minNormSol
-  sorry
+  have hconv := alphaSeq_tendsto X y η hX hη_pos hη_small
+  have heq : gdSeq X y η = Xᵀ.mulVec ∘ alphaSeq X y η := by
+    funext k; exact gdSeq_eq_transpose_alphaSeq X y η k
+  rw [heq, show minNormSol X y = Xᵀ.mulVec (alphaLimit X y) from rfl]
+  have hcont : Continuous (Xᵀ.mulVecLin : (Fin n → ℝ) →ₗ[ℝ] (Fin d → ℝ)) :=
+    LinearMap.continuous_of_finiteDimensional _
+  exact hcont.continuousAt.tendsto.comp hconv
 
 /-! ### Part 4: Interpolation Property -/
 
