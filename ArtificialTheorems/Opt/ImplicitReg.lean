@@ -111,7 +111,18 @@ def alphaLimit (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) : Fin n → 
 /-- XXᵀ is invertible when X has full row rank. -/
 lemma xxT_invertible (X : Matrix (Fin n) (Fin d) ℝ) (hX : X.rank = n) :
     IsUnit (X * Xᵀ).det := by
-  sorry
+  -- Step 1: rank(XXᵀ) = rank(X) = n
+  have hrank : (X * Xᵀ).rank = n := by
+    have : Xᴴ = Xᵀ := by ext i j; simp [conjTranspose, transpose, star]
+    rw [← this, rank_self_mul_conjTranspose, hX]
+  -- Step 2: rank = n for n×n matrix → IsUnit det
+  unfold Matrix.rank at hrank
+  have hfin : Module.finrank ℝ (Fin n → ℝ) = n := Module.finrank_fin_fun ℝ
+  have htop : (X * Xᵀ).mulVecLin.range = ⊤ :=
+    Submodule.eq_top_of_finrank_eq (by rw [hrank, hfin])
+  have hsurj := LinearMap.range_eq_top.mp htop
+  have hinj := Module.End.injective_of_surjective_fin hsurj
+  exact (isUnit_iff_isUnit_det _).mp (mulVec_injective_iff_isUnit.mp hinj)
 
 /-- The residual r_k = α_k - α* satisfies r_{k+1} = A r_k. -/
 -- Helper: alphaLimit is a fixed point of the iteration
