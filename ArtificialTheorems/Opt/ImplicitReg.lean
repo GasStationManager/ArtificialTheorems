@@ -73,8 +73,13 @@ lemma alpha_dynamics (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : 
     gdIter X y η (Xᵀ.mulVec α)
       = Xᵀ.mulVec ((iterMatrix X η).mulVec α + η • y) := by
   simp only [gdIter, iterMatrix]
-  -- Xᵀα - η • Xᵀ(XXᵀα - y) = Xᵀ((I - η XXᵀ)α + ηy)
-  sorry
+  -- Rewrite using mulVec linearity
+  -- LHS: Xᵀ *ᵥ α - η • (Xᵀ *ᵥ (X *ᵥ (Xᵀ *ᵥ α) - y))
+  -- RHS: Xᵀ *ᵥ ((1 - η • (X * Xᵀ)) *ᵥ α + η • y)
+  simp only [mulVec_add, mulVec_smul, sub_mulVec, one_mulVec, smul_mulVec,
+    mulVec_mulVec, mulVec_sub]
+  -- Now both sides should reduce to the same thing
+  module
 
 /-- The α-sequence satisfying w_k = Xᵀ α_k. -/
 def alphaSeq (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) : ℕ → Fin n → ℝ
@@ -109,11 +114,32 @@ lemma xxT_invertible (X : Matrix (Fin n) (Fin d) ℝ) (hX : X.rank = n) :
   sorry
 
 /-- The residual r_k = α_k - α* satisfies r_{k+1} = A r_k. -/
+-- Helper: alphaLimit is a fixed point of the iteration
+lemma alphaLimit_fixed_point (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (hX : X.rank = n) :
+    (iterMatrix X η).mulVec (alphaLimit X y) + η • y = alphaLimit X y := by
+  simp only [iterMatrix, alphaLimit]
+  rw [sub_mulVec, one_mulVec, Matrix.smul_mulVec_assoc, mulVec_mulVec,
+    mul_nonsing_inv _ (xxT_invertible X hX), one_mulVec]
+  simp [sub_add_cancel]
+
 lemma residual_dynamics (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
     (hX : X.rank = n) (k : ℕ) :
     alphaSeq X y η (k + 1) - alphaLimit X y
     = (iterMatrix X η).mulVec (alphaSeq X y η k - alphaLimit X y) := by
-  sorry
+  simp only [alphaSeq]
+  rw [mulVec_sub]
+  -- LHS: (A *ᵥ αₖ + η • y) - α*
+  -- RHS: A *ᵥ αₖ - A *ᵥ α*
+  -- So need: A *ᵥ αₖ + η • y - α* = A *ᵥ αₖ - A *ᵥ α*
+  -- i.e.: η • y - α* = -(A *ᵥ α*)
+  -- i.e.: A *ᵥ α* + η • y = α*  (which is alphaLimit_fixed_point)
+  have h := alphaLimit_fixed_point X y η hX
+  -- h : A *ᵥ α* + η • y = α*
+  ext i
+  have hi := congr_fun h i
+  simp only [Pi.sub_apply, Pi.add_apply, Pi.smul_apply, smul_eq_mul] at *
+  linarith
 
 /-- The operator norm of I - η XXᵀ is less than 1 for appropriate η. -/
 lemma iterMatrix_norm_lt_one (X : Matrix (Fin n) (Fin d) ℝ) (η : ℝ)
@@ -144,13 +170,8 @@ theorem gdSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η :
 theorem minNormSol_interpolates' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hX : X.rank = n) :
     X.mulVec (minNormSol X y) = y := by
-  -- minNormSol X y = Xᵀ.mulVec ((XXᵀ)⁻¹.mulVec y)
-  -- X.mulVec (Xᵀ.mulVec ((XXᵀ)⁻¹.mulVec y))
-  --   = (X * Xᵀ).mulVec ((XXᵀ)⁻¹.mulVec y)    [by mulVec_mulVec]
-  --   = ((XXᵀ) * (XXᵀ)⁻¹).mulVec y             [by mulVec_mulVec]
-  --   = 1.mulVec y                                [by mul_nonsing_inv]
-  --   = y                                         [by one_mulVec]
-  sorry
+  simp only [minNormSol]
+  rw [mulVec_mulVec, mulVec_mulVec, mul_nonsing_inv _ (xxT_invertible X hX), one_mulVec]
 
 /-! ### Part 5: Minimum Norm Property
 
