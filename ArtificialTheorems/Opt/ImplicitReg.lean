@@ -152,13 +152,25 @@ lemma residual_dynamics (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η
   simp only [Pi.sub_apply, Pi.add_apply, Pi.smul_apply, smul_eq_mul] at *
   linarith
 
-/-- The operator norm of I - η XXᵀ is less than 1 for appropriate η. -/
+/-- The operator norm of I - η XXᵀ is less than 1 for appropriate η.
+    BLOCKED: Requires spectral theory for positive semidefinite matrices.
+    The eigenvalues of XXᵀ are all positive (from full rank), and the step size
+    condition ensures 1 - η·λᵢ ∈ (-1, 1) for all eigenvalues λᵢ.
+    Mathlib lacks NormedRing instance for Matrix with elementwise norm,
+    and the operator norm theory needed here is not easily accessible. -/
 lemma iterMatrix_norm_lt_one (X : Matrix (Fin n) (Fin d) ℝ) (η : ℝ)
     (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
     ‖iterMatrix X η‖ < 1 := by
   sorry
 
-/-- The α-sequence converges to (XXᵀ)⁻¹ y. -/
+/-- The α-sequence converges to (XXᵀ)⁻¹ y.
+    BLOCKED on iterMatrix_norm_lt_one. The proof strategy:
+    By residual_dynamics, r_k = A^k *ᵥ r_0 where A = iterMatrix X η.
+    If ‖A‖ < 1, then A^k → 0, so r_k → 0, giving alphaSeq → alphaLimit.
+    However, Matrix (Fin n) (Fin n) ℝ lacks a NormedRing instance
+    (elementwise norm isn't submultiplicative), so the standard
+    tendsto_pow_atTop_nhds_zero_of_norm_lt_one doesn't apply directly.
+    Would need operator norm or manual bound ‖A^k *ᵥ v‖ ≤ ‖A‖ᵒᵖ^k · ‖v‖. -/
 theorem alphaSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
     (hX : X.rank = n) (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
     Tendsto (alphaSeq X y η) atTop (nhds (alphaLimit X y)) := by
@@ -209,15 +221,15 @@ lemma row_space_perp_null_space (X : Matrix (Fin n) (Fin d) ℝ)
   rw [← dotProduct_mulVec]
   rw [hz, dotProduct_zero]
 
-/-- The minimum-norm solution has smallest norm among all interpolants. -/
+/-- The minimum-norm solution has smallest norm among all interpolants.
+    BLOCKED: The Pythagorean argument requires L2 (inner product) norm, but ‖·‖
+    on `Fin d → ℝ` is the sup norm. The theorem is mathematically true for L2 norm
+    but not provable as stated. Fix: use `EuclideanSpace ℝ (Fin d)` throughout.
+    All algebraic prerequisites are proved (interpolation, orthogonality). -/
 theorem minNormSol_min_norm' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hX : X.rank = n) (hnd : n < d)
     (v : Fin d → ℝ) (hv : X.mulVec v = y) :
     ‖minNormSol X y‖ ≤ ‖v‖ := by
-  -- Decompose v = w̄ + z where z = v - w̄
-  -- Then X z = X v - X w̄ = y - y = 0, so z ∈ ker(X)
-  -- w̄ ∈ row(X), so ⟨w̄, z⟩ = 0
-  -- ‖v‖² = ‖w̄ + z‖² = ‖w̄‖² + 2⟨w̄,z⟩ + ‖z‖² = ‖w̄‖² + ‖z‖² ≥ ‖w̄‖²
   sorry
 
 /-! ### Main Theorem Assembly -/
