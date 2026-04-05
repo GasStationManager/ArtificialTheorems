@@ -16,7 +16,6 @@ References:
 -/
 
 import Mathlib
-import ArtificialTheoremsSpec.Opt.ImplicitRegSpec
 
 open Matrix Filter Topology BigOperators
 open scoped RealInnerProductSpace Matrix.Norms.Elementwise Matrix.Norms.L2Operator
@@ -26,6 +25,22 @@ noncomputable section
 namespace ImplicitReg
 
 variable {n d : ℕ}
+
+/-- The gradient descent iteration for linear regression:
+    w_{k+1} = w_k - η · Xᵀ(Xw_k - y) -/
+def gdIter (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    : (Fin d → ℝ) → (Fin d → ℝ) :=
+  fun w => w - η • Xᵀ.mulVec (X.mulVec w - y)
+
+/-- The GD sequence starting from w₀ = 0. -/
+def gdSeq (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    : ℕ → (Fin d → ℝ)
+  | 0 => 0
+  | k + 1 => gdIter X y η (gdSeq X y η k)
+
+/-- The minimum-norm interpolant: w̄ = Xᵀ(XXᵀ)⁻¹y -/
+def minNormSol (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) : Fin d → ℝ :=
+  Xᵀ.mulVec ((X * Xᵀ)⁻¹.mulVec y)
 
 /-! ### Part 1: Subspace Invariance -/
 
@@ -42,7 +57,7 @@ lemma gdIter_in_row_space (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (
   simp only [gdIter, hw, mulVec_sub, mulVec_smul, smul_sub]
 
 /-- Subspace invariance: GD iterates stay in row(X). -/
-theorem gd_in_row_space' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) (k : ℕ) :
+theorem gd_in_row_space (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) (k : ℕ) :
     ∃ α : Fin n → ℝ, gdSeq X y η k = Xᵀ.mulVec α := by
   induction k with
   | zero =>
@@ -344,7 +359,7 @@ theorem gdSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η :
 
 /-- The minimum-norm solution interpolates: X w̄ = y.
     Proof: X (Xᵀ (XXᵀ)⁻¹ y) = (XXᵀ)(XXᵀ)⁻¹ y = y. -/
-theorem minNormSol_interpolates' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+theorem minNormSol_interpolates (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hX : X.rank = n) :
     X.mulVec (minNormSol X y) = y := by
   simp only [minNormSol]
@@ -385,7 +400,7 @@ theorem minNormSol_min_dotProduct' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n �
     dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v := by
   let wbar : Fin d → ℝ := minNormSol X y
   let z : Fin d → ℝ := v - wbar
-  have hwbar_interp : X.mulVec wbar = y := minNormSol_interpolates' X y hX
+  have hwbar_interp : X.mulVec wbar = y := minNormSol_interpolates X y hX
   have hz_null : X.mulVec z = 0 := by
     dsimp [z]
     rw [mulVec_sub, hv, hwbar_interp, sub_self]
@@ -415,7 +430,7 @@ theorem minNormSol_min_dotProduct' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n �
     This replaces the earlier false `‖·‖`-based statement on `Fin d → ℝ`, where the
     inherited norm is the sup norm rather than the ℓ₂ norm. We keep the same ambient
     coordinates and expose the correct quadratic-form statement instead. -/
-theorem minNormSol_min_norm' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+theorem minNormSol_min_norm (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hX : X.rank = n) (_hnd : n < d)
     (v : Fin d → ℝ) (hv : X.mulVec v = y) :
     dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v := by
@@ -427,7 +442,7 @@ theorem minNormSol_min_norm' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ
     converges to the minimum ℓ₂-bias solution, given the Euclidean/L2 operator norm
     contraction hypothesis directly.
 
-    Use `implicit_l2_bias'` for the public-facing version with step-size hypotheses. -/
+    Use `implicit_l2_bias` for the public-facing version with step-size hypotheses. -/
 theorem implicit_l2_bias_of_contraction (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hnd : n < d) (hX : X.rank = n) (η : ℝ)
     (hA_contr : ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)‖ < 1) :
@@ -436,8 +451,8 @@ theorem implicit_l2_bias_of_contraction (X : Matrix (Fin n) (Fin d) ℝ) (y : Fi
     ∧ ∀ v : Fin d → ℝ, X.mulVec v = y →
         dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v :=
   ⟨gdSeq_tendsto X y η hnd hX hA_contr,
-   minNormSol_interpolates' X y hX,
-   fun v hv => minNormSol_min_norm' X y hX hnd v hv⟩
+   minNormSol_interpolates X y hX,
+   fun v hv => minNormSol_min_norm X y hX hnd v hv⟩
 
 /-- **Main theorem (literature-facing)**: Gradient descent on overparameterized linear
     regression with `w₀ = 0` converges to the minimum ℓ₂-norm interpolant
@@ -456,7 +471,7 @@ theorem implicit_l2_bias_of_contraction (X : Matrix (Fin n) (Fin d) ℝ) (y : Fi
     The step-size condition is expressed via the L2 operator norm
     `‖Matrix.toEuclideanCLM (X * Xᵀ)‖`, which equals the largest eigenvalue of `XXᵀ`
     (equivalently the largest singular value of `X` squared). -/
-theorem implicit_l2_bias' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+theorem implicit_l2_bias (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hnd : n < d) (hX : X.rank = n) (η : ℝ)
     (hη_pos : 0 < η)
     (hη_small : η * ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (X * Xᵀ)‖ < 2) :
