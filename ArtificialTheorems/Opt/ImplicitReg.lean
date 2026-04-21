@@ -16,16 +16,31 @@ References:
 -/
 
 import Mathlib
-import ArtificialTheoremsSpec.Opt.ImplicitRegSpec
 
 open Matrix Filter Topology BigOperators
-open scoped RealInnerProductSpace Matrix.Norms.Elementwise
+open scoped RealInnerProductSpace Matrix.Norms.Elementwise Matrix.Norms.L2Operator
 
 noncomputable section
 
 namespace ImplicitReg
 
 variable {n d : ℕ}
+
+/-- The gradient descent iteration for linear regression:
+    w_{k+1} = w_k - η · Xᵀ(Xw_k - y) -/
+def gdIter (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    : (Fin d → ℝ) → (Fin d → ℝ) :=
+  fun w => w - η • Xᵀ.mulVec (X.mulVec w - y)
+
+/-- The GD sequence starting from w₀ = 0. -/
+def gdSeq (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    : ℕ → (Fin d → ℝ)
+  | 0 => 0
+  | k + 1 => gdIter X y η (gdSeq X y η k)
+
+/-- The minimum-norm interpolant: w̄ = Xᵀ(XXᵀ)⁻¹y -/
+def minNormSol (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) : Fin d → ℝ :=
+  Xᵀ.mulVec ((X * Xᵀ)⁻¹.mulVec y)
 
 /-! ### Part 1: Subspace Invariance -/
 
@@ -42,7 +57,7 @@ lemma gdIter_in_row_space (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (
   simp only [gdIter, hw, mulVec_sub, mulVec_smul, smul_sub]
 
 /-- Subspace invariance: GD iterates stay in row(X). -/
-theorem gd_in_row_space' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) (k : ℕ) :
+theorem gd_in_row_space (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) (k : ℕ) :
     ∃ α : Fin n → ℝ, gdSeq X y η k = Xᵀ.mulVec α := by
   induction k with
   | zero =>
@@ -86,6 +101,45 @@ def alphaSeq (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) : �
   | 0 => 0
   | k + 1 => (iterMatrix X η).mulVec (alphaSeq X y η k) + η • y
 
+/-- The affine self-map on α-space underlying the reparameterized GD dynamics. -/
+def alphaStep (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) :
+    (Fin n → ℝ) → (Fin n → ℝ) :=
+  fun α => (iterMatrix X η).mulVec α + η • y
+
+/-- The same α-update, but on the genuine Euclidean/L2 space. This is the ambient space
+    in which the spectral bound for `I - η XXᵀ` is expected to apply. -/
+def alphaStepEuclidean (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ) :
+    EuclideanSpace ℝ (Fin n) → EuclideanSpace ℝ (Fin n) :=
+  fun α => Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η) α + WithLp.toLp 2 (η • y)
+
+@[simp] lemma alphaStepEuclidean_toLp (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (α : Fin n → ℝ) :
+    alphaStepEuclidean X y η (WithLp.toLp 2 α) = WithLp.toLp 2 (alphaStep X y η α) := by
+  simp [alphaStepEuclidean, alphaStep]
+
+@[simp] lemma ofLp_alphaStepEuclidean (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (α : EuclideanSpace ℝ (Fin n)) :
+    WithLp.ofLp (alphaStepEuclidean X y η α) = alphaStep X y η (WithLp.ofLp α) := by
+  simp [alphaStepEuclidean, alphaStep]
+
+lemma alphaSeq_eq_iterate_alphaStep (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (k : ℕ) : alphaSeq X y η k = (alphaStep X y η)^[k] 0 := by
+  induction k with
+  | zero => simp [alphaSeq]
+  | succ k ih => simp [alphaSeq, alphaStep, ih, Function.iterate_succ_apply']
+
+/-- Iterates of `alphaStepEuclidean` correspond to `WithLp.toLp 2` applied to iterates
+    of `alphaStep`. This is the bridge between the coordinate-level recurrence and the
+    Euclidean-space contraction argument. -/
+lemma alphaStepEuclidean_iterate (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (k : ℕ) :
+    (alphaStepEuclidean X y η)^[k] 0 = WithLp.toLp 2 ((alphaStep X y η)^[k] 0) := by
+  induction k with
+  | zero => rfl
+  | succ k ih =>
+    simp only [Function.iterate_succ_apply']
+    rw [ih, alphaStepEuclidean_toLp]
+
 /-- The w-sequence equals Xᵀ times the α-sequence. -/
 lemma gdSeq_eq_transpose_alphaSeq (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
     (k : ℕ) : gdSeq X y η k = Xᵀ.mulVec (alphaSeq X y η k) := by
@@ -128,60 +182,172 @@ lemma xxT_invertible (X : Matrix (Fin n) (Fin d) ℝ) (hX : X.rank = n) :
 -- Helper: alphaLimit is a fixed point of the iteration
 lemma alphaLimit_fixed_point (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
     (hX : X.rank = n) :
-    (iterMatrix X η).mulVec (alphaLimit X y) + η • y = alphaLimit X y := by
-  simp only [iterMatrix, alphaLimit]
+    alphaStep X y η (alphaLimit X y) = alphaLimit X y := by
+  simp only [alphaStep, iterMatrix, alphaLimit]
   rw [sub_mulVec, one_mulVec, Matrix.smul_mulVec, mulVec_mulVec,
     mul_nonsing_inv _ (xxT_invertible X hX), one_mulVec]
   simp [sub_add_cancel]
+
+lemma alphaLimit_fixed_point_euclidean (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
+    (hX : X.rank = n) :
+    alphaStepEuclidean X y η (WithLp.toLp 2 (alphaLimit X y)) =
+      WithLp.toLp 2 (alphaLimit X y) := by
+  simpa using congrArg (WithLp.toLp 2) (alphaLimit_fixed_point X y η hX)
 
 lemma residual_dynamics (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
     (hX : X.rank = n) (k : ℕ) :
     alphaSeq X y η (k + 1) - alphaLimit X y
     = (iterMatrix X η).mulVec (alphaSeq X y η k - alphaLimit X y) := by
-  simp only [alphaSeq]
   rw [mulVec_sub]
-  -- LHS: (A *ᵥ αₖ + η • y) - α*
-  -- RHS: A *ᵥ αₖ - A *ᵥ α*
-  -- So need: A *ᵥ αₖ + η • y - α* = A *ᵥ αₖ - A *ᵥ α*
-  -- i.e.: η • y - α* = -(A *ᵥ α*)
-  -- i.e.: A *ᵥ α* + η • y = α*  (which is alphaLimit_fixed_point)
-  have h := alphaLimit_fixed_point X y η hX
-  -- h : A *ᵥ α* + η • y = α*
   ext i
-  have hi := congr_fun h i
-  simp only [Pi.sub_apply, Pi.add_apply, Pi.smul_apply, smul_eq_mul] at *
+  have hfix := congr_fun (alphaLimit_fixed_point X y η hX) i
+  have hfix' : (iterMatrix X η).mulVec (alphaLimit X y) i + η * y i = alphaLimit X y i := by
+    simpa [alphaStep, Pi.add_apply, Pi.smul_apply, smul_eq_mul] using hfix
+  simp [alphaSeq, Pi.sub_apply, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
   linarith
 
-/-- The operator norm of I - η XXᵀ is less than 1 for appropriate η.
-    BLOCKED: Requires spectral theory for positive semidefinite matrices.
-    The eigenvalues of XXᵀ are all positive (from full rank), and the step size
-    condition ensures 1 - η·λᵢ ∈ (-1, 1) for all eigenvalues λᵢ.
-    Mathlib lacks NormedRing instance for Matrix with elementwise norm,
-    and the operator norm theory needed here is not easily accessible. -/
-lemma iterMatrix_norm_lt_one (X : Matrix (Fin n) (Fin d) ℝ) (η : ℝ)
-    (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
-    ‖iterMatrix X η‖ < 1 := by
-  sorry
+/-- The linear part of the α-update is a strict contraction in the Euclidean/L2 operator norm.
+
+    The continuous linear map `Matrix.toEuclideanCLM (iterMatrix X η)` on
+    `EuclideanSpace ℝ (Fin n)` has operator norm strictly less than 1.
+    This is the correct formulation: the spectral argument for the symmetric matrix
+    `I - η XXᵀ` bounds the L2 operator norm, matching the Euclidean inner product.
+
+    The mathematical argument:
+    • `X * Xᵀ` is symmetric positive semidefinite, with eigenvalues in `[0, ‖X * Xᵀ‖_op]`.
+    • `X.rank = n` forces all `n` eigenvalues to be strictly positive.
+    • `iterMatrix X η = I - η (X * Xᵀ)` has eigenvalues `1 - η σᵢ`.
+    • The step-size condition `η * ‖X * Xᵀ‖_op < 2` ensures each `|1 - η σᵢ| < 1`.
+    • Therefore the L2 operator norm (= spectral radius for Hermitian matrices) is `< 1`.
+
+    The proof uses the spectral theorem for the Hermitian matrix `X * Xᵀ`,
+    decomposes `I - η(XXᵀ)` in the eigenbasis, applies unitary invariance of
+    the L2 operator norm, and bounds each `|1 - η σᵢ| < 1`. -/
+private lemma xxT_isHermitian (X : Matrix (Fin n) (Fin d) ℝ) :
+    (X * Xᵀ).IsHermitian := by
+  rw [show Xᵀ = Xᴴ from (conjTranspose_eq_transpose_of_trivial X).symm]
+  exact isHermitian_mul_conjTranspose_self X
+
+lemma iterMatrix_euclidean_opNorm_lt_one (X : Matrix (Fin n) (Fin d) ℝ) (η : ℝ)
+    (hX : X.rank = n) (hη_pos : 0 < η)
+    (hη_small : η * ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (X * Xᵀ)‖ < 2) :
+    ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)‖ < 1 := by
+  classical
+  rw [l2_opNorm_toEuclideanCLM]
+  rw [l2_opNorm_toEuclideanCLM] at hη_small
+  have hB := xxT_isHermitian X
+  set σ := hB.eigenvalues
+  set U := hB.eigenvectorUnitary
+  -- Spectral theorem: XXᵀ = U * diagonal(σ) * U*
+  have hB_spec : X * Xᵀ =
+      (Unitary.conjStarAlgAut ℝ _ U) (diagonal ((RCLike.ofReal (K := ℝ)) ∘ σ)) :=
+    hB.spectral_theorem (𝕜 := ℝ)
+  -- Express iterMatrix = U * (I - η diag(σ)) * U*
+  have key : iterMatrix X η =
+      (Unitary.conjStarAlgAut ℝ _ U) (1 - η • diagonal ((RCLike.ofReal (K := ℝ)) ∘ σ)) := by
+    unfold iterMatrix
+    rw [hB_spec, map_sub, map_one, map_smul]
+  -- Reduce to ‖diagonal(1 - η σ)‖ < 1 via unitary invariance
+  rw [key, Unitary.conjStarAlgAut_apply]
+  rw [CStarRing.norm_mul_mem_unitary _ (Unitary.star_mem U.prop)]
+  rw [CStarRing.norm_coe_unitary_mul]
+  simp only [RCLike.ofReal_real_eq_id, Function.id_comp]
+  rw [show (1 : Matrix (Fin n) (Fin n) ℝ) - η • diagonal σ = diagonal (1 - η • σ) by
+    ext i j; simp only [sub_apply, one_apply, smul_apply, diagonal_apply, smul_eq_mul]
+    split <;> simp]
+  rw [l2_opNorm_diagonal]
+  -- Eigenvalues of XXᵀ are nonneg (PSD)
+  have hσ_nonneg : ∀ i, 0 ≤ σ i := by
+    intro i
+    have : (X * Xᵀ).PosSemidef := by
+      rw [show Xᵀ = Xᴴ from (conjTranspose_eq_transpose_of_trivial X).symm]
+      exact posSemidef_self_mul_conjTranspose X
+    exact this.eigenvalues_nonneg i
+  -- ‖XXᵀ‖ = sup|σ_i| via spectral decomposition
+  have hXXt_norm : ‖X * Xᵀ‖ = ‖σ‖ := by
+    conv_lhs => rw [hB_spec, Unitary.conjStarAlgAut_apply]
+    rw [CStarRing.norm_mul_mem_unitary _ (Unitary.star_mem U.prop)]
+    rw [CStarRing.norm_coe_unitary_mul]
+    simp only [RCLike.ofReal_real_eq_id, Function.id_comp]
+    rw [l2_opNorm_diagonal]
+  -- Each eigenvalue is bounded by the norm
+  have hσ_le_norm : ∀ i, σ i ≤ ‖X * Xᵀ‖ := by
+    intro i; rw [hXXt_norm]
+    exact le_trans (le_abs_self _) (norm_le_pi_norm σ i)
+  -- η * σ_i < 2 from the step-size hypothesis
+  have hησ_lt_2 : ∀ i, η * σ i < 2 := by
+    intro i
+    calc η * σ i ≤ η * ‖X * Xᵀ‖ :=
+          mul_le_mul_of_nonneg_left (hσ_le_norm i) hη_pos.le
+      _ < 2 := hη_small
+  -- All eigenvalues are strictly positive (rank = n forces no zero eigenvalues)
+  have hσ_pos : ∀ i, 0 < σ i := by
+    have h_rank : (X * Xᵀ).rank = Fintype.card {i // σ i ≠ 0} :=
+      hB.rank_eq_card_non_zero_eigs
+    have h_xxT_rank : (X * Xᵀ).rank = n := by
+      rw [show Xᵀ = Xᴴ from (conjTranspose_eq_transpose_of_trivial X).symm]
+      rw [Matrix.rank_self_mul_conjTranspose X]; exact hX
+    rw [h_xxT_rank] at h_rank
+    have h_all_nonzero : ∀ i, σ i ≠ 0 := by
+      by_contra h_neg; push_neg at h_neg; obtain ⟨i, hi⟩ := h_neg
+      have h1 : Fintype.card {j : Fin n // σ j ≠ 0} < Fintype.card (Fin n) :=
+        Fintype.card_subtype_lt (by rwa [not_not])
+      rw [Fintype.card_fin] at h1; linarith
+    intro i; exact lt_of_le_of_ne (hσ_nonneg i) (Ne.symm (h_all_nonzero i))
+  -- Conclude: sup_i |1 - η σ_i| < 1, since 0 < η σ_i < 2
+  rw [pi_norm_lt_iff one_pos]
+  intro i
+  simp only [Pi.sub_apply, Pi.one_apply, Pi.smul_apply, smul_eq_mul]
+  rw [Real.norm_eq_abs, abs_lt]
+  exact ⟨by linarith [hησ_lt_2 i], by linarith [mul_pos hη_pos (hσ_pos i)]⟩
 
 /-- The α-sequence converges to (XXᵀ)⁻¹ y.
-    BLOCKED on iterMatrix_norm_lt_one. The proof strategy:
-    By residual_dynamics, r_k = A^k *ᵥ r_0 where A = iterMatrix X η.
-    If ‖A‖ < 1, then A^k → 0, so r_k → 0, giving alphaSeq → alphaLimit.
-    However, Matrix (Fin n) (Fin n) ℝ lacks a NormedRing instance
-    (elementwise norm isn't submultiplicative), so the standard
-    tendsto_pow_atTop_nhds_zero_of_norm_lt_one doesn't apply directly.
-    Would need operator norm or manual bound ‖A^k *ᵥ v‖ ≤ ‖A‖ᵒᵖ^k · ‖v‖. -/
+
+    The proof works in `EuclideanSpace ℝ (Fin n)` where the spectral bound on
+    `I - η XXᵀ` gives a genuine L2 contraction, then transports convergence back
+    to `Fin n → ℝ` via the continuous equivalence `EuclideanSpace.equiv`. -/
 theorem alphaSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
-    (hX : X.rank = n) (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
+    (hX : X.rank = n)
+    (hA_contr : ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)‖ < 1) :
     Tendsto (alphaSeq X y η) atTop (nhds (alphaLimit X y)) := by
-  sorry
+  -- Work in EuclideanSpace ℝ (Fin n) where the L2 contraction applies
+  let AE : EuclideanSpace ℝ (Fin n) →L[ℝ] EuclideanSpace ℝ (Fin n) :=
+    Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)
+  have hκ_lt : (⟨‖AE‖, norm_nonneg _⟩ : NNReal) < 1 := hA_contr
+  have hAE_lip : LipschitzWith (⟨‖AE‖, norm_nonneg _⟩ : NNReal) AE :=
+    AE.lipschitzWith_of_opNorm_le (le_refl _)
+  -- alphaStepEuclidean is contracting with the same constant
+  have hstep_lip : LipschitzWith (⟨‖AE‖, norm_nonneg _⟩ : NNReal) (alphaStepEuclidean X y η) := by
+    refine LipschitzWith.of_dist_le_mul fun α β => ?_
+    simp only [dist_eq_norm, NNReal.coe_mk]
+    show ‖alphaStepEuclidean X y η α - alphaStepEuclidean X y η β‖ ≤ ‖AE‖ * ‖α - β‖
+    have h : alphaStepEuclidean X y η α - alphaStepEuclidean X y η β = AE (α - β) := by
+      show (AE α + _) - (AE β + _) = AE (α - β)
+      rw [add_sub_add_right_eq_sub, ← map_sub]
+    rw [h]; exact AE.le_opNorm _
+  have hstep_contr : ContractingWith (⟨‖AE‖, norm_nonneg _⟩ : NNReal) (alphaStepEuclidean X y η) :=
+    ⟨hκ_lt, hstep_lip⟩
+  -- Identify the Banach fixed point with alphaLimit
+  have hfix : Function.IsFixedPt (alphaStepEuclidean X y η) (WithLp.toLp 2 (alphaLimit X y)) :=
+    alphaLimit_fixed_point_euclidean X y η hX
+  have hfixed : WithLp.toLp 2 (alphaLimit X y) = hstep_contr.fixedPoint :=
+    hstep_contr.fixedPoint_unique hfix
+  -- Convergence in EuclideanSpace
+  have hiter : (fun k => (alphaStepEuclidean X y η)^[k] 0) =
+      fun k => WithLp.toLp 2 (alphaSeq X y η k) := by
+    funext k; rw [alphaStepEuclidean_iterate, alphaSeq_eq_iterate_alphaStep]
+  have hconv_E : Tendsto (fun k => WithLp.toLp 2 (alphaSeq X y η k)) atTop
+      (nhds (WithLp.toLp 2 (alphaLimit X y))) := by
+    rw [hfixed, ← hiter]; exact hstep_contr.tendsto_iterate_fixedPoint 0
+  -- Transport back to Fin n → ℝ via the continuous equivalence
+  exact (EuclideanSpace.equiv (Fin n) ℝ).continuous.continuousAt.tendsto.comp hconv_E
 
 /-- The GD sequence converges to the minimum-norm solution. -/
 theorem gdSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η : ℝ)
-    (hnd : n < d) (hX : X.rank = n)
-    (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
+    (_hnd : n < d) (hX : X.rank = n)
+    (hA_contr : ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)‖ < 1) :
     Tendsto (gdSeq X y η) atTop (nhds (minNormSol X y)) := by
-  have hconv := alphaSeq_tendsto X y η hX hη_pos hη_small
+  have hconv := alphaSeq_tendsto X y η hX hA_contr
   have heq : gdSeq X y η = Xᵀ.mulVec ∘ alphaSeq X y η := by
     funext k; exact gdSeq_eq_transpose_alphaSeq X y η k
   rw [heq, show minNormSol X y = Xᵀ.mulVec (alphaLimit X y) from rfl]
@@ -193,7 +359,7 @@ theorem gdSeq_tendsto (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ) (η :
 
 /-- The minimum-norm solution interpolates: X w̄ = y.
     Proof: X (Xᵀ (XXᵀ)⁻¹ y) = (XXᵀ)(XXᵀ)⁻¹ y = y. -/
-theorem minNormSol_interpolates' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+theorem minNormSol_interpolates (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
     (hX : X.rank = n) :
     X.mulVec (minNormSol X y) = y := by
   simp only [minNormSol]
@@ -221,29 +387,99 @@ lemma row_space_perp_null_space (X : Matrix (Fin n) (Fin d) ℝ)
   rw [← dotProduct_mulVec]
   rw [hz, dotProduct_zero]
 
-/-- The minimum-norm solution has smallest norm among all interpolants.
-    BLOCKED: The Pythagorean argument requires L2 (inner product) norm, but ‖·‖
-    on `Fin d → ℝ` is the sup norm. The theorem is mathematically true for L2 norm
-    but not provable as stated. Fix: use `EuclideanSpace ℝ (Fin d)` throughout.
-    All algebraic prerequisites are proved (interpolation, orthogonality). -/
-theorem minNormSol_min_norm' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
-    (hX : X.rank = n) (hnd : n < d)
+/-- Correct ℓ₂-style minimality statement in coordinate form:
+    among all interpolants, `minNormSol X y` minimizes the squared Euclidean norm,
+    expressed as `dotProduct w w`.
+
+    This is the narrowest viable repair of the false sup-norm statement above: we keep
+    the ambient coordinate type `Fin d → ℝ`, but measure size using the inner-product
+    quadratic form instead of the inherited `‖·‖` on functions. -/
+theorem minNormSol_min_dotProduct' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+    (hX : X.rank = n)
     (v : Fin d → ℝ) (hv : X.mulVec v = y) :
-    ‖minNormSol X y‖ ≤ ‖v‖ := by
-  sorry
+    dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v := by
+  let wbar : Fin d → ℝ := minNormSol X y
+  let z : Fin d → ℝ := v - wbar
+  have hwbar_interp : X.mulVec wbar = y := minNormSol_interpolates X y hX
+  have hz_null : X.mulVec z = 0 := by
+    dsimp [z]
+    rw [mulVec_sub, hv, hwbar_interp, sub_self]
+  obtain ⟨α, hwbar_row : wbar = Xᵀ.mulVec α⟩ := minNormSol_in_row_space X y
+  have hperp : dotProduct wbar z = 0 := by
+    rw [hwbar_row]
+    exact row_space_perp_null_space X α z hz_null
+  have hz_nonneg : 0 ≤ dotProduct z z := by
+    simpa [dotProduct] using Finset.sum_nonneg (fun i _ => by
+      have hi : 0 ≤ z i * z i := by nlinarith [sq_nonneg (z i)]
+      exact hi)
+  have hv_decomp : v = wbar + z := by
+    dsimp [z]
+    abel
+  calc
+    dotProduct wbar wbar ≤ dotProduct wbar wbar + dotProduct z z := by linarith
+    _ = dotProduct (wbar + z) (wbar + z) := by
+      have hzperp : dotProduct z wbar = 0 := by rw [dotProduct_comm, hperp]
+      have hs1 : ∑ x, wbar x * z x = 0 := by simpa [dotProduct] using hperp
+      have hs2 : ∑ x, z x * wbar x = 0 := by simpa [dotProduct] using hzperp
+      simp [dotProduct, Finset.sum_add_distrib, add_mul, mul_add, hs1, hs2]
+    _ = dotProduct v v := by rw [hv_decomp]
+
+/-- Public repaired minimality theorem: among all interpolants, `minNormSol X y`
+    minimizes the squared Euclidean norm in coordinate form.
+
+    This replaces the earlier false `‖·‖`-based statement on `Fin d → ℝ`, where the
+    inherited norm is the sup norm rather than the ℓ₂ norm. We keep the same ambient
+    coordinates and expose the correct quadratic-form statement instead. -/
+theorem minNormSol_min_norm (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+    (hX : X.rank = n) (_hnd : n < d)
+    (v : Fin d → ℝ) (hv : X.mulVec v = y) :
+    dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v := by
+  exact minNormSol_min_dotProduct' X y hX v hv
 
 /-! ### Main Theorem Assembly -/
 
-/-- Main theorem: Gradient descent on overparameterized linear regression
-    converges to the minimum ℓ₂-norm interpolant. -/
-theorem implicit_l2_bias' (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
-    (hnd : n < d) (hX : X.rank = n)
-    (η : ℝ) (hη_pos : 0 < η) (hη_small : η < 2 / ‖Xᵀ * X‖) :
+/-- Internal assembly: Gradient descent on overparameterized linear regression
+    converges to the minimum ℓ₂-bias solution, given the Euclidean/L2 operator norm
+    contraction hypothesis directly.
+
+    Use `implicit_l2_bias` for the public-facing version with step-size hypotheses. -/
+theorem implicit_l2_bias_of_contraction (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+    (hnd : n < d) (hX : X.rank = n) (η : ℝ)
+    (hA_contr : ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (iterMatrix X η)‖ < 1) :
     Tendsto (gdSeq X y η) atTop (nhds (minNormSol X y))
     ∧ X.mulVec (minNormSol X y) = y
-    ∧ ∀ v : Fin d → ℝ, X.mulVec v = y → ‖minNormSol X y‖ ≤ ‖v‖ :=
-  ⟨gdSeq_tendsto X y η hnd hX hη_pos hη_small,
-   minNormSol_interpolates' X y hX,
-   fun v hv => minNormSol_min_norm' X y hX hnd v hv⟩
+    ∧ ∀ v : Fin d → ℝ, X.mulVec v = y →
+        dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v :=
+  ⟨gdSeq_tendsto X y η hnd hX hA_contr,
+   minNormSol_interpolates X y hX,
+   fun v hv => minNormSol_min_norm X y hX hnd v hv⟩
+
+/-- **Main theorem (literature-facing)**: Gradient descent on overparameterized linear
+    regression with `w₀ = 0` converges to the minimum ℓ₂-norm interpolant
+    `w̄ = Xᵀ(XXᵀ)⁻¹y`.
+
+    Hypotheses:
+    - `X` has full row rank (`X.rank = n`)
+    - The system is overparameterized (`n < d`)
+    - Step size `η` satisfies `0 < η` and `η · ‖XXᵀ‖_L2 < 2`
+
+    Conclusions:
+    1. The GD iterates converge to `w̄`
+    2. `w̄` interpolates: `X w̄ = y`
+    3. `w̄` minimizes the squared ℓ₂ norm (as `dotProduct`) among all interpolants
+
+    The step-size condition is expressed via the L2 operator norm
+    `‖Matrix.toEuclideanCLM (X * Xᵀ)‖`, which equals the largest eigenvalue of `XXᵀ`
+    (equivalently the largest singular value of `X` squared). -/
+theorem implicit_l2_bias (X : Matrix (Fin n) (Fin d) ℝ) (y : Fin n → ℝ)
+    (hnd : n < d) (hX : X.rank = n) (η : ℝ)
+    (hη_pos : 0 < η)
+    (hη_small : η * ‖Matrix.toEuclideanCLM (n := Fin n) (𝕜 := ℝ) (X * Xᵀ)‖ < 2) :
+    Tendsto (gdSeq X y η) atTop (nhds (minNormSol X y))
+    ∧ X.mulVec (minNormSol X y) = y
+    ∧ ∀ v : Fin d → ℝ, X.mulVec v = y →
+        dotProduct (minNormSol X y) (minNormSol X y) ≤ dotProduct v v :=
+  implicit_l2_bias_of_contraction X y hnd hX η
+    (iterMatrix_euclidean_opNorm_lt_one X η hX hη_pos hη_small)
 
 end ImplicitReg
