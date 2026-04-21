@@ -16,8 +16,9 @@ This repo is a library of Lean 4 formalizations of theoretical foundations of AI
 | 4 | [SGD Unique Minimum](#4-sgd-convergence-to-unique-minimum) | `Opt/SGDUniqueMin` | 1753 | ✅ Proved | |
 | 5 | [Value Iteration Convergence](#5-value-iteration-convergence) | `RL/ValueIterationComplete` | 407 | ✅ Proved | |
 | 6 | [Approximate Value Iteration](#6-approximate-value-iteration) | `RL/ApproxValueIterationInt` | 437 | ✅ Proved | |
+| 7 | [Implicit Regularization of GD](#7-implicit-regularization-of-gradient-descent) | `Opt/ImplicitReg` | 485 | ✅ Proved | |
 
-**Total: ~11,250 LOC, 6 formalized results, 0 sorrys.**
+**Total: ~11,735 LOC, 7 formalized results, 0 sorrys.**
 
 ---
 
@@ -83,6 +84,21 @@ This repo is a library of Lean 4 formalizations of theoretical foundations of AI
 - Spec: [`ArtificialTheoremsSpec/RL/ApproxValueIterationIntSpec.lean`](ArtificialTheoremsSpec/RL/ApproxValueIterationIntSpec.lean)
 - Proof: [`ArtificialTheorems/RL/ApproxValueIterationInt.lean`](ArtificialTheorems/RL/ApproxValueIterationInt.lean)
 
+### 7. Implicit Regularization of Gradient Descent
+
+**Theorem.** Gradient descent on overparameterized linear regression (n < d) with w₀ = 0 converges to the minimum ℓ₂-norm interpolant w̄ = Xᵀ(XXᵀ)⁻¹y. Specifically:
+1. The GD iterates converge to w̄
+2. w̄ interpolates the training data: Xw̄ = y
+3. w̄ minimizes the squared ℓ₂ norm among all interpolants
+
+The proof proceeds via reparameterization into α-space (dual coordinates), where the iteration becomes an affine contraction. Convergence follows from the Banach fixed-point theorem applied in `EuclideanSpace ℝ (Fin n)`, using the spectral theorem for the symmetric matrix XXᵀ to bound the L2 operator norm of the iteration matrix I − ηXXᵀ. Minimality uses the Pythagorean decomposition: any interpolant v = w̄ + z where z ∈ null(X), and w̄ ∈ row(X) ⊥ null(X).
+
+**Reference:** Gunasekar, S., Woodworth, B., Bhojanapalli, S., Neyshabur, B., Srebro, N. "Implicit Regularization in Matrix Factorization." *NeurIPS* 2017. See also: Zhang, C. et al. "Understanding deep learning requires rethinking generalization." *ICLR* 2017.
+
+**Files:**
+- Spec: [`ArtificialTheoremsSpec/Opt/ImplicitRegSpec.lean`](ArtificialTheoremsSpec/Opt/ImplicitRegSpec.lean)
+- Proof: [`ArtificialTheorems/Opt/ImplicitReg.lean`](ArtificialTheorems/Opt/ImplicitReg.lean)
+
 ---
 
 ## Verification
@@ -108,7 +124,7 @@ I am particularly interested in these areas:
 - Universal representation theorems for deep neural nets
 - Generalization theory
   - A recent Lean formalization of generalization error bound by Rademacher complexity: https://github.com/auto-res/lean-rademacher
-- Implicit regularization (how training via SGD can achieve generalization)
+- Implicit regularization — extensions beyond linear regression (matrix factorization, deep linear networks)
 - RL theory
   - A recent Lean formalization of convergence of Q-Learning: https://github.com/ShangtongZhang/rl-theory-in-lean
 - Bayesian learning; and perhaps building on top of that, Singular Learning Theory.
