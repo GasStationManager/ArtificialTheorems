@@ -17,8 +17,9 @@ This repo is a library of Lean 4 formalizations of theoretical foundations of AI
 | 5 | [Value Iteration Convergence](#5-value-iteration-convergence) | `RL/ValueIterationComplete` | 407 | ✅ Proved | |
 | 6 | [Approximate Value Iteration](#6-approximate-value-iteration) | `RL/ApproxValueIterationInt` | 437 | ✅ Proved | |
 | 7 | [Implicit Regularization of GD](#7-implicit-regularization-of-gradient-descent) | `Opt/ImplicitReg` | 485 | ✅ Proved | |
+| 8 | [Proper Scoring Rules (Savage/Gneiting-Raftery)](#8-proper-scoring-rules) | `InfoTheory/ProperScoring` | 250 | ✅ Proved | |
 
-**Total: ~11,735 LOC, 7 formalized results, 0 sorrys.**
+**Total: ~11,985 LOC, 8 formalized results, 0 sorrys.**
 
 ---
 
@@ -98,6 +99,22 @@ The proof proceeds via reparameterization into α-space (dual coordinates), wher
 **Files:**
 - Spec: [`ArtificialTheoremsSpec/Opt/ImplicitRegSpec.lean`](ArtificialTheoremsSpec/Opt/ImplicitRegSpec.lean)
 - Proof: [`ArtificialTheorems/Opt/ImplicitReg.lean`](ArtificialTheorems/Opt/ImplicitReg.lean)
+
+### 8. Proper Scoring Rules
+
+**Theorem (Savage characterization).** For binary outcomes, proper scoring rules are in 1-1 correspondence with convex functions on [0,1]. Specifically:
+1. **(Proper → convex)** For any proper scoring rule, the generalized entropy G(p) = E_p[S(p,O)] is convex on [0,1]. Strictly proper implies strictly convex.
+2. **(Convex → proper, Savage 1971)** Given any convex G and subgradient g, the scoring rule S(q,1) = G(q) + (1−q)·g(q), S(q,0) = G(q) − q·g(q) is proper. Strict convexity gives strict properness.
+3. **(Normalization)** Under S(0,0) = S(1,1) = 0: G(0) = G(1) = 0, and convexity implies G(p) ≤ 0 on [0,1] with G(p) < 0 on (0,1) for strictly proper rules.
+4. **(Brier score)** The Brier score S(q,o) = −(q−o)² is strictly proper, with G(p) = −p(1−p).
+
+**References:**
+- Savage, L. J. "Elicitation of Personal Probabilities and Expectations." *JASA* 66(336): 783–801, 1971.
+- Gneiting, T. & Raftery, A. E. "Strictly Proper Scoring Rules, Prediction, and Estimation." *JASA* 102(477): 359–378, 2007. [arXiv:0706.1270](https://arxiv.org/abs/0706.1270).
+
+**Files:**
+- Spec: [`ArtificialTheoremsSpec/InfoTheory/ProperScoringSpec.lean`](ArtificialTheoremsSpec/InfoTheory/ProperScoringSpec.lean)
+- Proof: [`ArtificialTheorems/InfoTheory/ProperScoring.lean`](ArtificialTheorems/InfoTheory/ProperScoring.lean)
 
 ---
 

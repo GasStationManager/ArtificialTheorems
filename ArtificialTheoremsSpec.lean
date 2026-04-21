@@ -5,3 +5,4 @@ import ArtificialTheoremsSpec.RL.ValueIterationCompleteSpec
 import ArtificialTheoremsSpec.RL.ApproxValueIterationIntSpec
 import ArtificialTheoremsSpec.Approx.UniversalApproxSpec
 import ArtificialTheoremsSpec.Learning.NoFreeLunchSpec
+import ArtificialTheoremsSpec.InfoTheory.ProperScoringSpec
